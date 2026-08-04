@@ -1,0 +1,120 @@
+{
+  "schema_version": "1.0",
+  "run_mode": "formal_autodl",
+  "paper_evidence": true,
+  "data_root": "/root/autodl-tmp/AgentRelay",
+  "hardware": "AutoDL RTX 4090D (24 GB)",
+  "models": {
+    "edge": {
+      "model_id": "Qwen/Qwen2.5-1.5B-Instruct",
+      "requested_revision": "main",
+      "revision": "UNLOCKED",
+      "dtype": "bfloat16",
+      "quantization": "none",
+      "device_map": "auto",
+      "max_new_tokens": 512,
+      "do_sample": false,
+      "seed": 0
+    },
+    "cloud": {
+      "model_id": "Qwen/Qwen2.5-14B-Instruct",
+      "requested_revision": "main",
+      "revision": "UNLOCKED",
+      "dtype": "bfloat16",
+      "quantization": "bnb_4bit",
+      "device_map": "auto",
+      "max_new_tokens": 1024,
+      "do_sample": false,
+      "seed": 0
+    }
+  },
+  "datasets": [
+    {
+      "name": "agentprocessbench",
+      "hf_id": "LulaCola/AgentProcessBench",
+      "config_name": "bfcl",
+      "requested_revision": "main",
+      "revision": "UNLOCKED",
+      "splits": ["test"],
+      "purpose": "diagnostic_only"
+    },
+    {
+      "name": "alfworld_raw_mirror",
+      "hf_id": "awawa-agi/alfworld-raw",
+      "requested_revision": "main",
+      "revision": "UNLOCKED",
+      "splits": ["train", "eval_in_distribution", "eval_out_of_distribution"],
+      "purpose": "upstream_hash_checked_mirror"
+    }
+  ],
+  "repositories": [
+    {
+      "name": "alfworld",
+      "url": "https://github.com/alfworld/alfworld.git",
+      "requested_revision": "HEAD",
+      "revision": "UNLOCKED"
+    },
+    {
+      "name": "webshop",
+      "url": "https://github.com/princeton-nlp/WebShop.git",
+      "requested_revision": "HEAD",
+      "revision": "UNLOCKED"
+    },
+    {
+      "name": "appworld",
+      "url": "https://github.com/StonyBrookNLP/appworld.git",
+      "requested_revision": "HEAD",
+      "revision": "UNLOCKED"
+    }
+  ],
+  "benchmarks": {
+    "alfworld": {
+      "evaluation_splits": ["valid_seen", "valid_unseen"],
+      "max_steps": 50,
+      "max_prompt_tokens": 2048,
+      "max_response_tokens": 512
+    },
+    "webshop": {
+      "evaluation_splits": ["test"],
+      "max_steps": 20,
+      "max_prompt_tokens": 4096,
+      "max_response_tokens": 1024
+    },
+    "appworld": {
+      "evaluation_splits": ["test_normal", "test_challenge"],
+      "max_steps": 50,
+      "max_prompt_tokens": 4096,
+      "max_response_tokens": 1024
+    }
+  },
+  "controller": {
+    "minimum_dwell_steps": 2,
+    "switch_hysteresis_ms": 5.0,
+    "calibration_alpha": 0.1,
+    "minimum_calibration_group_size": 20
+  },
+  "implemented_methods": [
+    "edge_only",
+    "cloud_only",
+    "random_0.3",
+    "random_0.5",
+    "routellm_task",
+    "frugalgpt_cascade",
+    "model_only_step",
+    "agentrouter_style",
+    "hera_agreement",
+    "full_replay_step",
+    "uncalibrated_joint",
+    "agentrelay"
+  ],
+  "limits": {
+    "sample_limit": null,
+    "runs": 3
+  },
+  "integrity": {
+    "allow_synthetic_tasks": false,
+    "allow_test_label_access": false,
+    "native_inference_only": true,
+    "allow_prompt_answer_injection": false
+  }
+}

@@ -1,0 +1,51 @@
+[build-system]
+requires = ["setuptools>=69", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "agentrelay"
+version = "0.1.0"
+description = "Switch-cost-aware and transaction-safe state handoffs for edge-cloud LLM agents"
+readme = "README.md"
+requires-python = ">=3.10"
+license = {text = "Apache-2.0"}
+authors = [{name = "Anonymous Authors"}]
+dependencies = []
+
+[project.optional-dependencies]
+smoke = [
+  "accelerate>=1.0,<2",
+  "datasets>=3.0,<5",
+  "huggingface-hub>=0.26,<1",
+  "safetensors>=0.4,<1",
+  "torch>=2.4,<3",
+  "transformers>=4.46,<5",
+]
+ml = [
+  "accelerate>=1.0,<2",
+  "bitsandbytes>=0.44; platform_system == 'Linux'",
+  "datasets>=3.0,<5",
+  "huggingface-hub>=0.26,<1",
+  "numpy>=1.26",
+  "safetensors>=0.4,<1",
+  "scikit-learn>=1.5",
+  "torch>=2.4,<3",
+  "transformers>=4.46,<5",
+]
+dev = [
+  "pytest>=8.0",
+  "ruff>=0.9",
+]
+
+[project.scripts]
+agentrelay = "agentrelay.cli:main"
+
+[tool.setuptools]
+package-dir = {"" = "src"}
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.ruff]
+line-length = 100
+target-version = "py310"

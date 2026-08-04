@@ -1,0 +1,42 @@
+{
+  "schema_version": "1.0",
+  "run_mode": "local_smoke",
+  "paper_evidence": false,
+  "data_root": "artifacts/local-data",
+  "hardware": "RTX 4080 Laptop",
+  "models": {
+    "edge": {
+      "model_id": "Qwen/Qwen2.5-1.5B-Instruct",
+      "requested_revision": "main",
+      "revision": "UNLOCKED",
+      "dtype": "bfloat16",
+      "quantization": "none",
+      "device_map": "auto",
+      "max_new_tokens": 128,
+      "do_sample": false,
+      "seed": 0
+    }
+  },
+  "datasets": [
+    {
+      "name": "agentprocessbench",
+      "hf_id": "LulaCola/AgentProcessBench",
+      "config_name": "bfcl",
+      "requested_revision": "main",
+      "revision": "UNLOCKED",
+      "splits": ["test"],
+      "purpose": "diagnostic_only"
+    }
+  ],
+  "repositories": [],
+  "limits": {
+    "sample_limit": 8,
+    "max_steps": 4
+  },
+  "integrity": {
+    "allow_synthetic_tasks": false,
+    "allow_test_label_access": false,
+    "native_inference_only": true,
+    "allow_prompt_answer_injection": false
+  }
+}

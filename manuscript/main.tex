@@ -1,0 +1,1002 @@
+\documentclass[10pt]{article}
+
+\IfFileExists{neurips_2026.sty}{
+  \usepackage[preprint]{neurips_2026}
+}{
+  \usepackage[margin=1in]{geometry}
+}
+\usepackage{amsmath,amssymb,booktabs,graphicx,microtype,multirow}
+\usepackage[numbers,sort&compress]{natbib}
+\usepackage{xcolor}
+\usepackage{hyperref}
+\usepackage{url}
+
+\newcommand{\system}{\textsc{AgentRelay}}
+\newcommand{\relaytax}{\mathrm{RelayTax}}
+\newcommand{\tbd}{\textcolor{red}{TBD}}
+\newcommand{\methodtag}[1]{\textsc{#1}}
+
+\title{\system: Switch-Cost-Aware and Transaction-Safe State Handoffs\\
+for Edge--Cloud LLM Agents}
+\author{Anonymous Authors}
+\date{}
+
+\begin{document}
+\maketitle
+
+\begin{center}
+\fbox{\parbox{0.94\linewidth}{
+\textbf{Internal pre-experimental draft.}
+This manuscript specifies falsifiable claims, public-data protocols, and
+pre-registered analyses. Every empirical cell is intentionally marked
+\tbd{} until produced by native inference under the locked configuration.
+The draft must not be submitted or used to claim empirical superiority in
+its present form.}}
+\end{center}
+
+\begin{abstract}
+Edge--cloud language-model agents can reduce monetary cost and latency by
+executing routine steps locally and escalating difficult steps to a stronger
+cloud model. Existing routers largely treat each decision as model selection:
+they estimate which executor is likely to succeed, then choose one under a
+cost or quality objective. Stateful agents make this abstraction incomplete.
+A switch also transfers a partially executed trajectory, and retries may
+repeat external effects. The resulting relay tax---serialization, network
+transfer, context reprocessing, validation, and repair---can reverse an
+otherwise sensible routing decision. We present \system, a handoff protocol
+and joint policy that chooses an executor, a state-transfer mode, and an
+effect-commit mode together. \system{} uses typed, content-addressed state
+deltas; validates identity, provenance, invariants, and effect histories at
+the receiver; requests narrow patches when validation fails; and records
+idempotent effect keys in a transaction ledger. A switch-cost-aware selector
+uses measured rather than nominal costs and can abstain from switching when
+the expected gain is smaller than the relay tax. We define an evaluation on
+public ALFWorld, WebShop, AppWorld, and AgentProcessBench data, with immutable
+splits, native model inference, recorded network traces, and paired
+uncertainty tests. Results are pending. The contribution of this draft is
+therefore a complete, auditable hypothesis and implementation package rather
+than an unsupported empirical claim.
+\end{abstract}
+
+\section{Introduction}
+\label{sec:introduction}
+
+Tool-using language-model agents repeatedly observe an environment, reason
+about the next step, call tools, and update an evolving trajectory
+\citep{yao2023react,schick2023toolformer,liu2024agentbench}. Running every
+step on a large remote model is often unnecessary, whereas running every step
+on a smaller local model can sacrifice task success. Recent routing systems
+select among models or execution sites using predicted quality, confidence,
+cost, or latency
+\citep{chen2024frugalgpt,ong2025routellm,paul2026agentrouter,
+zhang2026hera,son2026swerouter,liu2026agenticrouting}. These systems motivate
+step-level edge--cloud execution, but they also expose a systems question that
+is easy to hide in a model-selection formulation: what exactly crosses the
+boundary when an agent switches executors?
+
+The answer is more than a prompt. At step $t$, the receiving executor may
+need the task identity, normalized observations, compact evidence, the current
+plan, tool outputs, open obligations, and the status of external effects. A
+full replay can be faithful but expensive. A summary can be cheap but omit a
+binding constraint. A retry after a timeout may repeat a purchase, message,
+or file operation even if model generation itself is deterministic. Thus a
+handoff is a state-transfer and transaction event, not merely a new inference
+request.
+
+We call the total incremental cost of that event the \emph{relay tax}. It
+includes state encoding, bytes transmitted under the observed link, receiver
+validation, context prefill, and any repair request. The tax depends on the
+current trajectory and transfer mode; it is not a constant surcharge. A
+router that ignores it can choose the cloud because the cloud has a higher
+predicted success probability, even though staying local has lower measured
+cost for the same constrained objective. Conversely, transferring a small
+typed delta can make a beneficial switch affordable when full replay cannot.
+
+\system{} makes handoff a first-class protocol. Each decision selects the
+compound action
+\[
+ a_t=(e_t,m_t,c_t),
+\]
+where $e_t$ is the next executor, $m_t$ is a transfer mode, and $c_t$ is an
+effect-commit mode. The state packet is typed and content-addressed. The
+receiver verifies task identity, parent state, required fields, provenance,
+and legal effect transitions before execution. A failed check triggers a
+narrow patch request rather than silently proceeding with incomplete state.
+For effectful tools, an idempotency ledger separates authorization,
+preparation, commitment, and compensation so that a retry cannot casually
+duplicate an already committed action.
+
+This paper advances four testable contributions:
+\begin{enumerate}
+  \item \textbf{Measured switch-cost routing.} We formulate the relay tax and
+  show analytically when omitting it reverses the action selected by a
+  constrained router. The implementation records serialization, transfer,
+  validation, repair, and context-processing costs per handoff.
+  \item \textbf{Joint executor--payload decisions.} We route over executor,
+  state-transfer mode, and commit mode rather than selecting a model first and
+  treating state movement as fixed plumbing.
+  \item \textbf{Typed delta transfer with verified repair.} We introduce
+  content-addressed deltas, receiver-side invariants, and patch-on-demand to
+  test whether smaller payloads preserve replay-equivalent decision state.
+  \item \textbf{Transaction-safe agent effects.} We integrate an effect
+  ledger with the handoff protocol and test exactly-once behavior under
+  retries, timeouts, and executor switches.
+\end{enumerate}
+
+The claims are deliberately narrower than broad agent superiority. We ask
+whether measuring handoff cost changes routing, whether joint routing improves
+the quality--cost--latency frontier, whether verified deltas preserve state,
+and whether the ledger prevents duplicated effects. These questions are
+evaluated independently so that a negative answer to one does not disappear
+inside an aggregate task-success score.
+
+\section{Background and Problem Formulation}
+\label{sec:problem}
+
+\subsection{Stateful edge--cloud agents}
+
+An episode has task $x$, environment observations $o_{1:T}$, tool calls
+$u_{1:T}$, and latent decision state $s_t$. An executor belongs to
+$\mathcal{E}=\{\mathrm{edge},\mathrm{cloud}\}$, although the formulation
+extends to more models. Let $h_t$ denote the materialized trajectory visible
+at step $t$. A conventional router estimates an outcome utility $I(e_t\mid
+h_t)$ and an inference cost $C_{\mathrm{infer}}(e_t,h_t)$. This misses the
+cost and correctness of making $h_t$ usable at a different executor.
+
+We factor the transferable state into five typed components:
+\[
+s_t=(q_t,o_t,z_t,\pi_t,\ell_t).
+\]
+Here $q_t$ identifies the immutable task, $o_t$ is normalized world state,
+$z_t$ contains evidence and tool outputs with provenance, $\pi_t$ is the
+current plan and obligations, and $\ell_t$ is the effect ledger. The sender
+may reuse resident state, send a full packet, or send a delta against a
+content hash known by the receiver.
+
+\subsection{Measured relay tax}
+
+For candidate action $a=(e,m,c)$ at step $t$, we measure
+\begin{align}
+H_t(a) ={}&
+ \lambda_b B_t(m)
+ +\lambda_n L_t^{\mathrm{net}}(B_t(m))
+ +\lambda_s L_t^{\mathrm{ser}}(m) \nonumber\\
+&+\lambda_v L_t^{\mathrm{verify}}(m)
+ +\lambda_p L_t^{\mathrm{prefill}}(e,m)
+ +\mathbb{E}\!\left[\lambda_r L_t^{\mathrm{repair}}(m)\right],
+\label{eq:relay-tax}
+\end{align}
+where $B_t$ is transmitted bytes and each $L$ is an observed duration or
+resource quantity. The weights put heterogeneous measurements into the
+deployment objective. No term is inferred from a nominal bandwidth alone:
+the evaluation replays recorded link traces and retains raw component
+measurements.
+
+Let $p_t(a)$ be predicted probability of eventual task success, $I_t(a)$ the
+direct inference cost, and $R_t(a)$ the expected risk cost of invalid state or
+external-effect failure. The unconstrained scalar form is
+\begin{equation}
+J_t(a)=I_t(a)+H_t(a)+R_t(a)-\beta p_t(a).
+\label{eq:objective}
+\end{equation}
+The deployed selector instead minimizes measured cost subject to
+$p_t(a)\geq\tau_q$, a latency budget, memory feasibility, and protocol
+validity. Equation~\ref{eq:objective} is useful for analysis and for
+displaying Pareto trade-offs; it is not permission to tune $\beta$ on test
+episodes.
+
+\paragraph{Switch-cost reversal.}
+Consider staying with action $s$ and switching with action $q$. Suppose the
+switch has relay tax $H_q>0$ and staying has no handoff tax. A router that
+ignores handoff chooses $q$ when
+$\beta(p_q-p_s)>I_q-I_s$. The measured objective chooses $s$ when
+$\beta(p_q-p_s)<I_q-I_s+H_q$. Therefore the decisions disagree exactly in
+the interval
+\begin{equation}
+ I_q-I_s < \beta(p_q-p_s) < I_q-I_s+H_q.
+\label{eq:reversal}
+\end{equation}
+This elementary interval is operationally important: a larger predicted
+model gain need not justify a stateful switch. Experiment E1 measures how
+often real trajectories fall in this interval and whether those reversals
+improve the realized objective.
+
+\section{Related Work}
+\label{sec:related}
+
+\paragraph{LLM and agent routing.}
+Cascade and routing work demonstrates that heterogeneous models can improve
+the quality--cost frontier. FrugalGPT composes model calls under a budget
+\citep{chen2024frugalgpt}; RouteLLM learns preference-based routers
+\citep{ong2025routellm}; and AgentRouter specializes routing for agentic tasks
+\citep{paul2026agentrouter}. More recent systems move routing inside an
+episode. Hera uses hierarchical orchestration for heterogeneous agents
+\citep{zhang2026hera}; SWE-Router routes software-engineering steps
+\citep{son2026swerouter}; and harness-native Agentic Routing makes the
+execution harness aware of model choice \citep{liu2026agenticrouting}.
+Speculative and co-serving systems additionally optimize latency and resource
+use \citep{ye2026speculative,xiang2026scheduler,dekoninck2025unified}.
+Confidence-token routing is another learned uncertainty signal for this
+decision \citep{chuang2025confidence}.
+\system{} does not claim to originate step-level routing. Its distinction is
+to expose state transfer, receiver validation, and effect commitment as
+jointly selected and measured parts of each routing action.
+
+\paragraph{Context and state compression.}
+Prompt-compression methods reduce token count while attempting to retain
+task-relevant information \citep{jiang2023llmlingua,jiang2024longllmlingua}.
+Agent-specific work studies folding or compressing long execution state
+\citep{sun2026contextfolding,sharma2026statecompression}. These methods can be
+used inside a payload encoder, but a compressed string does not by itself
+establish that the receiver has the correct task, parent version, evidence
+provenance, or effect history. \system{} instead treats a delta as a typed
+state transition with explicit invariants. This choice is intentionally less
+general than free-form summarization and more directly auditable.
+
+\paragraph{Portable and distributed agents.}
+Prior work studies portable context and agent handoff
+\citep{ravindran2026portable,kc2026handoff}, placement across edge and cloud
+\citep{wang2025placement}, and atomic execution for multi-agent systems
+\citep{mohammadi2026atomix}. These lines establish that mobility and atomicity
+matter. Our focus is the interaction among routing, the measured cost of
+moving a live trajectory, replay-equivalent state validation, and
+exactly-once external effects. The effect protocol is inspired by classic
+compensating transactions \citep{garciamolina1987sagas}, but it is not a
+distributed database transaction: external tools may offer only idempotency
+keys or compensating actions, and \system{} records that limitation.
+
+\paragraph{Agent benchmarks.}
+ALFWorld evaluates text agents grounded in interactive household tasks
+\citep{shridhar2021alfworld}; WebShop evaluates compositional web interaction
+\citep{yao2022webshop}; and AppWorld provides executable APIs and stateful
+application tasks \citep{trivedi2024appworld}. AgentProcessBench evaluates
+intermediate process quality rather than only final answers
+\citep{fan2026agentprocessbench}. We use these public resources for distinct
+roles: ALFWorld and WebShop measure long-horizon routing; AppWorld stresses
+effectful calls; AgentProcessBench provides a process-level diagnostic.
+
+\section{\system{} Design}
+\label{sec:design}
+
+\subsection{Design goals and non-goals}
+
+The protocol has four goals. First, a receiver either reconstructs a state
+that satisfies declared invariants or refuses execution. Second, transfer
+costs remain observable at component level. Third, a repeated handoff or tool
+retry cannot silently duplicate a committed effect. Fourth, all learned
+estimators are train-split artifacts and can be replaced without weakening
+protocol checks.
+
+\system{} does not guarantee semantic equivalence between arbitrary natural
+language summaries, global serializability across unrelated tools, or success
+from an incapable base model. It also does not infer a hidden world state that
+the benchmark does not expose. These boundaries are important: a protocol can
+prevent structurally invalid continuation and duplicated effects without
+proving that an LLM's plan is correct.
+
+\subsection{Relay state packet}
+\label{sec:packet}
+
+Table~\ref{tab:packet} summarizes the packet. Canonical JSON serialization
+sorts keys and uses normalized separators before hashing. Each packet contains
+a schema version, immutable task identity, sequence number, parent-state hash,
+payload hash, provenance records, declared invariants, and effect records.
+The sealed packet hash covers every field required for validation.
+
+\begin{table}[t]
+\centering
+\small
+\caption{Logical contents of a relay state packet. All identifiers and hashes
+are deterministic under canonical serialization.}
+\label{tab:packet}
+\begin{tabular}{p{0.20\linewidth}p{0.72\linewidth}}
+\toprule
+Field & Purpose \\
+\midrule
+Task identity & Benchmark, split, immutable example identifier, and task hash \\
+Version chain & Schema version, sequence number, parent packet hash, sender, receiver \\
+World state & Normalized observation and environment-visible facts \\
+Evidence & Tool outputs or observations with source, timestamp, and content hash \\
+Plan state & Current objective, completed steps, open obligations, and constraints \\
+Effect ledger & Canonical effect key, class, status, attempt, result hash, compensation link \\
+Integrity & Required paths, payload hash, packet hash, and provenance declarations \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+The packet separates \emph{observed facts} from model-generated plan state.
+Evidence items retain their origin and hash; generated rationales cannot be
+silently relabeled as environment observations. Task identity binds a packet
+to one immutable benchmark instance, preventing accidental reuse across
+episodes. A monotonically increasing sequence and parent hash make stale or
+forked updates detectable.
+
+\subsection{Transfer modes and typed deltas}
+\label{sec:delta}
+
+The compound action chooses one of three transfer modes:
+\begin{description}
+  \item[\methodtag{Reuse}] The target executor already holds the exact packet
+  hash, so no payload is transmitted.
+  \item[\methodtag{Full}] The sender transmits the complete sealed packet.
+  This is the fidelity reference and the fallback when no common parent exists.
+  \item[\methodtag{Delta}] The sender transmits typed patch operations against
+  a receiver-known parent hash.
+\end{description}
+
+A delta $d_t=(h_{t-1},\Delta_t,h_t)$ names its parent and expected child
+hashes. Operations are restricted to typed paths and explicit
+\textsc{add}, \textsc{replace}, or \textsc{remove} semantics. Applying a
+delta is accepted only when the local parent hash equals $h_{t-1}$ and the
+materialized child seals to $h_t$. This design prevents a common ambiguity in
+free-form summaries: absence can mean either unchanged, deliberately removed,
+or accidentally omitted. The operation type makes those cases distinct.
+
+Content-addressed trace storage de-duplicates packets and evidence blobs.
+Delta selection compares the estimated serialized size and validation cost
+with full transfer; it does not assume that a delta is always smaller. If the
+parent is absent or the estimated delta is larger, \methodtag{Full} remains a
+valid candidate.
+
+\subsection{Receiver validation and patch-on-demand}
+\label{sec:validation}
+
+Before invoking a model, the receiver runs deterministic checks in the
+following order:
+\begin{enumerate}
+  \item verify schema version, canonical payload hash, and packet hash;
+  \item match benchmark, split, example identifier, and task hash;
+  \item verify the declared parent and monotone sequence;
+  \item check required state paths and evidence provenance;
+  \item reject duplicate effect keys or illegal effect-state transitions; and
+  \item evaluate task-adapter invariants that depend only on public
+  environment state.
+\end{enumerate}
+
+Failure is fail-closed. If the missing information is patchable, the receiver
+returns a structured request naming required paths and the expected parent.
+The sender responds with a sealed patch bundle, after which the receiver
+re-validates the full materialized state. Hash mismatch, task mismatch, or an
+illegal effect transition is not patchable and aborts the handoff. Patch
+frequency and patch bytes are included in the relay tax rather than removed
+from latency reports.
+
+We define \emph{state fidelity} relative to full replay. Given the same model
+commit, decoding configuration, random seed, environment state, and step,
+a transferred state is replay-equivalent when it passes all deterministic
+invariants and produces the same canonical next tool action as full replay.
+This is an operational measure, not a claim of equivalence between hidden
+model representations.
+
+\subsection{Effect ledger and commit modes}
+\label{sec:ledger}
+
+Each externally visible tool action is normalized into an intent tuple
+$(\mathrm{task},\mathrm{tool},\mathrm{arguments},\mathrm{scope})$ and assigned
+a canonical effect key. Tool adapters classify actions as read-only,
+idempotent, compensatable, or irreversible. A ledger record moves through
+\textsc{authorized}, \textsc{prepared}, \textsc{committed}, and, where
+supported, \textsc{compensated}. The transition relation rejects a second
+commit for the same key and rejects a different normalized intent that
+collides with an existing key.
+
+The policy chooses a commit mode compatible with the adapter:
+\begin{description}
+  \item[\methodtag{Read}] executes side-effect-free calls without a commit;
+  \item[\methodtag{Idempotent}] passes the canonical key to a tool that
+  natively de-duplicates retries;
+  \item[\methodtag{Prepare--commit}] records authorization and preparation
+  before the external call, then commits the returned result hash; and
+  \item[\methodtag{Compensating}] additionally records the inverse action
+  when atomic rollback is unavailable.
+\end{description}
+
+An uncertain timeout never becomes an implicit retry. The adapter first
+queries by idempotency key when possible; otherwise the episode is marked
+indeterminate and handled according to the benchmark's official semantics.
+This conservative rule may reduce nominal completion rate, but avoids
+labeling duplicated real effects as success.
+
+\subsection{Joint action selection}
+\label{sec:policy}
+
+For every valid $a=(e,m,c)$, the selector estimates success probability,
+inference cost, relay-tax components, latency, and protocol risk. Candidate
+features include task metadata, trajectory length, tool class, recent
+failures, packet sizes, receiver cache state, and the current recorded link
+sample. The feature schema is fixed before evaluation. Separate probability
+and cost heads are fit only on native rollouts from the official training
+split; validation selects regularization and the quality threshold.
+
+Selection is constrained rather than purely score-based. Invalid commit modes
+and memory-infeasible executors are removed. Among actions meeting the
+validation-chosen success and latency constraints, the policy minimizes
+predicted measured cost. If none is feasible, a declared fallback chooses the
+highest predicted success among protocol-valid actions. Ties are deterministic.
+For analysis, the same predictions are passed to a zero-tax counterfactual
+that sets $H_t(a)=0$. Its disagreements with the deployed selector identify
+candidate switch-cost reversals without changing executed trajectories.
+
+This formulation couples routing and representation. A large model with a
+full replay, the same model with a delta, and staying local with resident
+state are different candidates. A sequential baseline that first chooses a
+model and then applies one fixed transfer rule cannot express this trade-off.
+
+\section{Implementation}
+\label{sec:implementation}
+
+The research artifact is a Python package with no mandatory machine-learning
+dependency in its protocol core. The core defines packet schemas, canonical
+hashing, state diff and application, validation, the effect ledger, measured
+cost accounting, constrained selection, provenance manifests, metrics, and
+statistical utilities. This separation allows protocol and failure tests to
+run without downloading a model.
+
+Native inference is implemented through pinned Hugging Face Transformers
+revisions using each model's official chat template. The executor records
+input and output tokens, wall-clock time, peak device memory, prompt hash,
+model commit, tokenizer commit, decoding parameters, and seed. Model outputs
+are immutable run artifacts. Benchmark adapters, rather than prompts, expose
+official observations, actions, termination conditions, and evaluation
+results.
+
+The initial joint estimator is intentionally lightweight. Per-action logistic
+heads estimate success and ridge heads estimate continuous costs from a fixed
+feature schema. Training rows are generated by native rollouts on official
+training tasks. The package rejects rows whose provenance indicates a
+validation or test split. Learned artifacts store their training-manifest
+hash so that a result can be traced back to data, code, model, and command.
+This estimator is not presented as a learning contribution; it is a controlled
+way to test the systems mechanisms.
+
+Configuration is fail-closed. A formal configuration requires immutable model,
+dataset, and repository commits, disallows a sample limit, enables native
+inference, disables test-label access, and fixes all storage beneath
+\texttt{/root/autodl-tmp/AgentRelay}. A local configuration can run bounded
+diagnostics but is explicitly marked as non-evidence. Public benchmark
+repositories and Hugging Face datasets are downloaded only after revisions
+are resolved to immutable commits.
+
+\section{Evaluation Methodology}
+\label{sec:evaluation}
+
+\subsection{Research questions}
+
+The evaluation is organized around four primary questions:
+\begin{description}
+  \item[RQ1:] How large is the relay tax, and how often does measuring it
+  reverse an executor or payload decision?
+  \item[RQ2:] Does joint executor--payload--commit selection improve the
+  Pareto frontier relative to fixed transfer or model-only routing?
+  \item[RQ3:] Do typed deltas with validation and patching reduce transfer
+  while retaining replay-equivalent continuation state?
+  \item[RQ4:] Does the effect ledger prevent duplicated or conflicting
+  mutations under handoff failures and retries?
+\end{description}
+Each question has a separate experiment and rejection condition; aggregate
+task success alone cannot validate all four.
+
+\subsection{Public benchmarks and immutable splits}
+\label{sec:benchmarks}
+
+All task instances come from public benchmark releases. We neither generate
+new tasks nor paraphrase existing ones.
+
+\paragraph{ALFWorld.}
+ALFWorld contains 3,827 text-interactive household tasks
+\citep{shridhar2021alfworld}. Training rollouts use only its official training
+split. Formal evaluation reports the complete standard \texttt{valid\_seen}
+and \texttt{valid\_unseen} partitions separately and jointly (140 and 134
+tasks in the pinned distribution). Episodes are capped at 50 environment
+steps, with 2,048 prompt tokens and 512 response tokens.
+
+\paragraph{WebShop.}
+WebShop contains 12,087 crowd-sourced instructions grounded in a corpus of
+approximately 1.18 million products \citep{yao2022webshop}. We retain the
+official train, development, and test manifests from the pinned release.
+Formal evaluation uses the complete official test manifest, a 20-step cap,
+4,096 prompt tokens, and 1,024 response tokens.
+
+\paragraph{AppWorld.}
+AppWorld provides stateful application APIs and executable evaluators
+\citep{trivedi2024appworld}. We retain its official 105/60/168/417
+train/dev/test-normal/test-challenge split. Training and trace generation use
+the 105 training tasks; development selects thresholds; both test partitions
+are evaluated once by the frozen pipeline. Episodes use a 50-step cap, 4,096
+prompt tokens, and 1,024 response tokens. Mutation-safety claims are confined
+to this official sandbox.
+
+\paragraph{Diagnostic data.}
+AgentProcessBench provides 1,000 public trajectories spanning BFCL, GAIA-dev,
+HotpotQA, and tau2 \citep{fan2026agentprocessbench}. It is used only for local
+schema and process diagnostics. Its labels neither train the final main-task
+router nor score the main comparison.
+
+\paragraph{Network conditions.}
+Communication robustness replays payloads through ordered, public recorded
+cellular traces, beginning with the Verizon LTE traces distributed with
+Mahimahi \citep{netravali2015mahimahi}. Samples retain their original order;
+traces are never randomized, interpolated into synthetic tasks, or repeated
+past exhaustion. Trace-driven communication latency is reported separately
+from live GPU wall-clock latency.
+
+\subsection{Models and hardware}
+
+The primary pair uses Qwen2.5 instruction-tuned models
+\citep{qwen2024qwen25}: \texttt{Qwen2.5-1.5B-Instruct} as the edge executor
+in BF16 and \texttt{Qwen2.5-14B-Instruct} as the cloud-equivalent executor
+with 4-bit weight loading. A shared family reduces tokenizer and prompt-format
+confounds while retaining a substantial capacity difference. Revisions are
+resolved and locked before any evidence run. Greedy decoding is the default;
+if an official harness requires sampling, three declared seeds are used
+identically across paired methods.
+
+The local RTX 4080 Laptop is restricted to unit tests, dependency validation,
+short public-data pipeline checks, and a small non-reportable pilot. All
+router fitting, complete benchmark inference, comparisons, ablations, and
+reported measurements run on an AutoDL RTX 4090D. The two models are profiled
+as warm services sequentially when simultaneous residency would introduce a
+memory confound. Replayed service time is labeled as such and never presented
+as simultaneous live execution.
+
+\subsection{Baselines and fairness controls}
+\label{sec:baselines}
+
+We compare edge-only, cloud-only, random routers, a FrugalGPT-style cascade
+\citep{chen2024frugalgpt}, a RouteLLM-style task router
+\citep{ong2025routellm}, an executor-only step router, an AgentRouter-style
+classifier \citep{paul2026agentrouter}, and a Hera-style device--cloud router
+\citep{zhang2026hera}. Official implementations are used when they support
+the pinned benchmark and model pair. Otherwise we label the method as a
+paper-faithful reimplementation and publish every deviation; we do not paste
+numbers from incompatible papers into the main table.
+
+State-transfer baselines are full replay, recency truncation, a frozen
+narrative-summary prompt, an unverified structured snapshot, typed delta
+without repair, and the full verify-and-patch protocol. Narrative and
+structured baselines are matched to the typed payload by target-token count
+where feasible, and unmatched cases are disclosed. Reliability baselines are
+no ledger, key-based de-duplication only, and an Atomix-inspired progress
+barrier \citep{mohammadi2026atomix}. All methods share task prompts, tool
+schemas, model commits, decoding, maximum tokens, environment-step caps, task
+order, seeds, and hardware profiles.
+
+An oracle that sees realized per-action outcomes may be reported only as a
+non-deployable upper bound. It is excluded from statistical comparisons and
+never supplies labels, features, or thresholds to a deployed method.
+
+\subsection{Metrics and statistical protocol}
+\label{sec:metrics}
+
+Task quality uses each benchmark's official success or reward, supplemented
+by invalid-action rate and environment steps. Efficiency reports end-to-end
+trajectory latency, median and 95th-percentile step latency, cloud-step ratio,
+switches per trajectory, transfer bytes, target-tokenized input, peak GPU
+memory, and each component of Equation~\ref{eq:relay-tax}. Warm and cold model
+loading are separate conditions.
+
+State fidelity reports required-invariant recall, hash and provenance
+validity, stale-version rejection, first-pass rehydration, patch rate and
+rounds, patch bytes, canonical next-action agreement with full replay, and
+continuation success. Effect correctness reports duplicate commits,
+conflicting mutations, official final-state correctness, collateral state
+failures, recovery success, and recovery latency.
+
+Methods see tasks in identical order with identical seeds. Binary outcomes are
+paired by task and analyzed with exact McNemar tests; continuous paired
+differences use deterministic task-level bootstrap confidence intervals.
+Primary comparisons apply Holm correction. For stochastic components we
+report three independent runs, mean and standard deviation for convention,
+and task-level 95\% paired intervals. Heavy-tailed latency and size are
+summarized by median and p95 rather than a normal approximation. Exact
+commands, raw JSONL records, manifests, and correction families are retained.
+
+\subsection{Experiment matrix and predeclared decisions}
+
+\begin{table}[t]
+\centering
+\small
+\caption{Predeclared experiments. A claim is supported only if its primary
+test and mechanism-specific diagnostics agree.}
+\label{tab:experiments}
+\begin{tabular}{p{0.08\linewidth}p{0.39\linewidth}p{0.20\linewidth}p{0.22\linewidth}}
+\toprule
+ID & Intervention & Primary outcome & Claim decision \\
+\midrule
+E1 & Full frozen-policy comparison & Success and Pareto frontier & C2 \\
+E2 & Forced matched-position handoffs & Fidelity and transfer size & C3 \\
+E3 & Zero-tax versus measured-tax replay & Validated route reversals & C1 \\
+E4 & Four interruption points in AppWorld & Duplicate effects and final state & C4 \\
+E5 & Ordered recorded network traces & Frontier by trace condition & C1--C2 robustness \\
+E6 & Optional cross-family model pair & Directional replication & Scope only \\
+E7 & Packet and controller scaling & Latency, bytes, memory & Systems overhead \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+E2 forces handoffs at positions selected from the manifest without outcome
+labels. E3 replays the same frozen states through a zero-tax counterfactual,
+an inference-only cost model, and the measured full objective, then validates
+changed choices by native continuation. E4 interrupts immediately before
+tool send, after send before acknowledgement, after acknowledgement before
+packet commit, and during target retry. Failure injection changes execution
+timing only; it does not alter tasks, desired answers, or evaluator state.
+
+The claim criteria are conservative. C1 requires nonzero validated routing
+reversals and an improved realized objective, not merely measurable overhead.
+C2 requires nondomination or a statistically supported improvement in a
+predeclared quality-constrained region, not one favorable scalarization. C3
+requires lower transfer than full replay while preserving both invariant and
+continuation fidelity; smaller packets alone are insufficient. C4 requires
+zero duplicate committed effects under the declared injections and no
+degradation of official final-state correctness relative to the strongest
+runnable reliability baseline.
+
+\section{Results}
+\label{sec:results}
+
+No formal result exists at manuscript-drafting time. Tables
+\ref{tab:main-results}--\ref{tab:ablation-results} are schemas connected to
+the immutable result pipeline; \tbd{} is not a zero and must not be included
+in an average, plot, or claim.
+
+\begin{table*}[t]
+\centering
+\small
+\caption{Main frozen-policy comparison on complete official evaluation
+splits. Values will include 95\% paired intervals where applicable.
+APB is diagnostic-only and is excluded from this table.}
+\label{tab:main-results}
+\resizebox{\textwidth}{!}{
+\begin{tabular}{llrrrrrr}
+\toprule
+Benchmark & Method & Success or reward & E2E latency & Cloud steps & Switches &
+Transfer bytes & Peak GPU memory \\
+\midrule
+ALFWorld seen/unseen & Edge-only & \tbd & \tbd & \tbd & \tbd & \tbd & \tbd \\
+ & Cloud-only & \tbd & \tbd & \tbd & \tbd & \tbd & \tbd \\
+ & Model-only step router & \tbd & \tbd & \tbd & \tbd & \tbd & \tbd \\
+ & Hera-style router & \tbd & \tbd & \tbd & \tbd & \tbd & \tbd \\
+ & \system{} & \tbd & \tbd & \tbd & \tbd & \tbd & \tbd \\
+\midrule
+WebShop test & Edge-only & \tbd & \tbd & \tbd & \tbd & \tbd & \tbd \\
+ & Cloud-only & \tbd & \tbd & \tbd & \tbd & \tbd & \tbd \\
+ & Model-only step router & \tbd & \tbd & \tbd & \tbd & \tbd & \tbd \\
+ & Hera-style router & \tbd & \tbd & \tbd & \tbd & \tbd & \tbd \\
+ & \system{} & \tbd & \tbd & \tbd & \tbd & \tbd & \tbd \\
+\midrule
+AppWorld normal/challenge & Edge-only & \tbd & \tbd & \tbd & \tbd & \tbd & \tbd \\
+ & Cloud-only & \tbd & \tbd & \tbd & \tbd & \tbd & \tbd \\
+ & Model-only step router & \tbd & \tbd & \tbd & \tbd & \tbd & \tbd & \tbd \\
+ & Hera-style router & \tbd & \tbd & \tbd & \tbd & \tbd & \tbd \\
+ & \system{} & \tbd & \tbd & \tbd & \tbd & \tbd & \tbd \\
+\bottomrule
+\end{tabular}}
+\end{table*}
+
+\begin{table}[t]
+\centering
+\small
+\caption{Relay-tax decomposition and routing reversal analysis (E3).}
+\label{tab:relay-results}
+\begin{tabular}{lrrr}
+\toprule
+Quantity & ALFWorld & WebShop & AppWorld \\
+\midrule
+Encode / E2E latency & \tbd & \tbd & \tbd \\
+Transfer / E2E latency & \tbd & \tbd & \tbd \\
+Verify and patch / E2E & \tbd & \tbd & \tbd \\
+Rehydration / E2E & \tbd & \tbd & \tbd \\
+Decision reversal rate & \tbd & \tbd & \tbd \\
+Validated beneficial reversals & \tbd & \tbd & \tbd \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\begin{table}[t]
+\centering
+\small
+\caption{Matched-position state-transfer comparison (E2).}
+\label{tab:fidelity-results}
+\resizebox{\linewidth}{!}{
+\begin{tabular}{lrrrr}
+\toprule
+Transfer mode & Bytes & Invariant recall & Action agreement & Continuation success \\
+\midrule
+Full replay & \tbd & \tbd & \tbd & \tbd \\
+Recency truncation & \tbd & \tbd & \tbd & \tbd \\
+Narrative summary & \tbd & \tbd & \tbd & \tbd \\
+Unverified snapshot & \tbd & \tbd & \tbd & \tbd \\
+Typed delta, no patch & \tbd & \tbd & \tbd & \tbd \\
+\system{} verify and patch & \tbd & \tbd & \tbd & \tbd \\
+\bottomrule
+\end{tabular}}
+\end{table}
+
+\begin{table}[t]
+\centering
+\small
+\caption{AppWorld interruption experiment (E4). Counts retain their
+task-level denominators in the result artifact.}
+\label{tab:effect-results}
+\begin{tabular}{lrrr}
+\toprule
+Method & Duplicate commits & Correct final state & Recovery latency \\
+\midrule
+No ledger & \tbd & \tbd & \tbd \\
+De-duplication only & \tbd & \tbd & \tbd \\
+Commit barrier & \tbd & \tbd & \tbd \\
+\system{} & \tbd & \tbd & \tbd \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\begin{table}[t]
+\centering
+\small
+\caption{Mechanism ablations aggregated only after reporting
+benchmark-specific results.}
+\label{tab:ablation-results}
+\resizebox{\linewidth}{!}{
+\begin{tabular}{lrrrr}
+\toprule
+Variant & Success & Measured cost & Transfer bytes & Invalid or duplicate effects \\
+\midrule
+Full \system{} & \tbd & \tbd & \tbd & \tbd \\
+Without relay tax & \tbd & \tbd & \tbd & \tbd \\
+Executor-only action & \tbd & \tbd & \tbd & \tbd \\
+Fixed typed delta & \tbd & \tbd & \tbd & \tbd \\
+Without validation & \tbd & \tbd & \tbd & \tbd \\
+Verify without patch & \tbd & \tbd & \tbd & \tbd \\
+Without effect ledger & \tbd & \tbd & \tbd & \tbd \\
+\bottomrule
+\end{tabular}}
+\end{table}
+
+\paragraph{Planned interpretation.}
+After execution, this paragraph will report effect sizes and uncertainty
+before significance labels. A route reversal counts as beneficial only when
+the native continuation realizes a lower constrained objective. Pareto claims
+will display all measured operating points; a single hand-selected threshold
+will not stand in for a frontier. State failures will be categorized as
+missing field, stale parent, hash or provenance mismatch, patch exhaustion,
+or continuation disagreement. Effect failures will identify the interruption
+point and tool class. Negative and null outcomes remain in the paper.
+
+\section{Discussion}
+\label{sec:discussion}
+
+\subsection{What each possible outcome would mean}
+
+The design admits informative negative results. If the measured relay tax is
+small and E3 finds no validated reversal, C1 is rejected; the paper should
+then present the protocol as a state-correctness mechanism rather than a
+routing advance. If joint selection matches an executor-only policy, C2 is
+rejected even if deltas save bytes. If typed deltas are compact but reduce
+continuation fidelity, C3 is rejected and full replay becomes the appropriate
+default. If the ledger fails at an interruption point, C4 is restricted to
+the tool classes and transitions that pass. These outcomes are encoded in the
+project gates so that wording follows evidence instead of retroactively
+changing the experiment.
+
+Several combinations are also diagnostically useful. A high relay tax with no
+beneficial reversal would imply estimator or constraint error rather than an
+irrelevant systems cost. Strong invariant recall with weak next-action
+agreement would indicate that the declared schema omits decision-relevant
+state. Zero duplicate commits with poor task success could mean that the
+ledger is safe but too conservative. Reporting these mechanism-level signals
+prevents one end-to-end number from masking the cause.
+
+\subsection{Deployment implications}
+
+The action space makes caching and network conditions visible to policy.
+Resident state can favor staying on an otherwise weaker executor; a small
+delta can favor switching; and an irreversible effect can force a commit
+barrier even when it increases latency. This is relevant whenever model
+placement and state placement differ. It also suggests a practical interface
+between agent frameworks and routers: the framework should expose packet
+availability, effect class, and measurable handoff components instead of
+offering only prompt text and model scores.
+
+The protocol deliberately defaults unknown effect classes to the safer
+barrier path. This is appropriate for benchmark and enterprise automation but
+can be too conservative for high-throughput, low-impact tools. Deployments
+may define adapter-specific risk policies, provided that those policies are
+fixed before evaluation and that unknown effects are not silently treated as
+read-only.
+
+\section{Limitations and Threats to Validity}
+\label{sec:limitations}
+
+\paragraph{Benchmark scope.}
+Three interactive benchmark families cannot represent every long-running
+agent. ALFWorld and WebShop emphasize textual interaction, whereas AppWorld
+offers a sandbox rather than irreversible real services. AgentProcessBench is
+diagnostic only. Conclusions must therefore be scoped to the tested adapters,
+task distributions, and public releases.
+
+\paragraph{Exactly-once boundary.}
+Exactly-once behavior is attainable only when the tool accepts an idempotency
+key, exposes queryable effect state, or supports a reliable compensation.
+With a non-queryable irreversible service and an acknowledgement lost after
+execution, no client-side protocol can distinguish an unexecuted action from
+an executed but unacknowledged action. \system{} labels that case
+indeterminate and refuses an automatic retry. The paper must not generalize
+sandbox results to uncooperative external APIs.
+
+\paragraph{State fidelity.}
+Canonical action agreement is an observable proxy for continuation fidelity,
+not proof that two model executions have identical internal states. The typed
+schema may omit a fact that becomes relevant later, and benchmark-specific
+invariants may be incomplete. Full replay is therefore retained as a fallback
+and reference rather than declared unnecessary.
+
+\paragraph{Hardware realism.}
+A single 4090D can reproduce native inference and warm service profiles but is
+not a physical edge--cloud deployment. Recorded public traces isolate
+communication sensitivity, while sequential model profiling avoids
+contention; neither captures every production queue, network stack, or remote
+accelerator. We report live, profiled, and trace-replayed quantities
+separately. Claims about absolute production latency require external
+validation.
+
+\paragraph{Model and estimator dependence.}
+The primary same-family model pair controls some prompt-format variation but
+may favor transfer compatibility. The lightweight estimator can be
+miscalibrated under distribution shift. An optional cross-family replication
+tests directionality, yet does not establish universality. Test labels remain
+unavailable to the router, so calibration failures cannot be repaired after
+test evaluation.
+
+\paragraph{Instrumentation effects.}
+Canonical serialization, hashing, and validation add controller work. This
+cost is part of the treatment and is measured, but fine-grained timing itself
+can perturb short operations. E7 repeats microbenchmarks, separates warm-up,
+and retains raw samples. Result interpretation emphasizes end-to-end
+differences and intervals rather than sub-millisecond point estimates.
+
+\paragraph{Security and privacy.}
+Integrity hashes detect accidental or adversarial modification but do not
+encrypt state or authenticate principals. Evidence packets may contain
+sensitive observations in a real deployment. Encryption, key management,
+access control, retention, and traffic-analysis resistance are outside this
+paper and are required before handling private data.
+
+\section{Responsible Research and Reproducibility}
+\label{sec:responsible}
+
+The study uses public benchmark tasks and sandboxed environments; it does not
+collect human-subject data or invoke real purchases, messages, or account
+mutations. Repository and dataset licenses are recorded at download time.
+Benchmark text is not modified, and no synthetic task augments an evaluation
+split. Narrative examples, if later included, are selected by a declared
+representative, difficult, or failure rule and retain their public sample
+identifiers.
+
+Every formal run emits a manifest containing dataset and model commits,
+sample identifiers, split, seed, prompt and code hashes, configuration,
+command, hardware, timestamp, and output hashes. Raw native outputs are
+append-only. Aggregation consumes those records and does not accept manually
+entered result cells. The locked formal configuration requires all models,
+datasets, repositories, logs, and outputs below
+\texttt{/root/autodl-tmp/AgentRelay}, which persists across AutoDL instance
+restarts. GPU hours, peak memory, failed runs, and exclusions will accompany
+the final artifact.
+
+\section{Conclusion}
+\label{sec:conclusion}
+
+Edge--cloud agent routing is incomplete when it treats a switch as only a
+model-selection decision. \system{} represents the switch as a measured,
+validated, and effect-aware transaction. Its four proposed innovations are a
+relay-tax-aware objective, joint executor--payload--commit selection, typed
+deltas with verify-and-patch recovery, and an idempotent effect ledger. The
+artifact and evaluation plan isolate each mechanism using public tasks,
+immutable splits, native inference, recorded network traces, and paired
+statistics. Whether these mechanisms improve real quality--cost--latency and
+correctness trade-offs remains an empirical question; this draft reserves
+that conclusion until the formal 4090D runs populate the registered result
+artifacts.
+
+\appendix
+
+\section{Claim--Evidence Contract}
+\label{app:claims}
+
+\begin{table*}[h]
+\centering
+\small
+\caption{Contract between manuscript claims and required evidence. No claim
+graduates from proposed to supported without all required rows.}
+\label{tab:claim-contract}
+\begin{tabular}{p{0.06\textwidth}p{0.26\textwidth}p{0.30\textwidth}p{0.28\textwidth}}
+\toprule
+Claim & Mechanism & Required evidence & Failure or narrowing rule \\
+\midrule
+C1 & Component-measured relay tax in routing &
+E3 component timings, zero-tax disagreements, and native validation of changed
+choices & Reject if no beneficial validated reversal; retain overhead profile \\
+C2 & Joint executor, transfer, and commit action &
+E1 complete-split frontier plus executor-only and fixed-transfer comparisons &
+Reject if frontier is dominated or indistinguishable in the declared region \\
+C3 & Typed delta, deterministic validation, narrow patch &
+E2 matched positions and size, invariant, action, and continuation metrics &
+Reject if transfer is not lower or fidelity falls beyond the validation bound \\
+C4 & Canonical effect keys and legal state transitions &
+E4 all four interruption points, official final state, duplicates, and recovery &
+Restrict to passing tool classes; reject broad exactly-once wording on any
+unexplained duplicate \\
+\bottomrule
+\end{tabular}
+\end{table*}
+
+\section{Handoff Procedure}
+\label{app:procedure}
+
+\paragraph{Sender.}
+The sender seals the current packet, checks whether the receiver acknowledges
+its hash, enumerates protocol-valid compound actions, and records the selected
+action and all predictions. For a delta it materializes a typed diff against
+the acknowledged parent. For full transfer it sends the complete canonical
+packet. The sender never removes a committed effect record.
+
+\paragraph{Receiver.}
+The receiver obtains the named parent from content-addressed storage, applies
+the delta if present, recomputes hashes, and runs the validation sequence in
+Section~\ref{sec:validation}. A patchable failure returns exact paths or trace
+references. Other failures abort. Only a validated packet is rendered through
+the executor's official chat template.
+
+\paragraph{Tool boundary.}
+The adapter canonicalizes an intended call before execution. Read-only calls
+are logged. A mutating call must be authorized under a compatible commit mode,
+and its key is transferred with state. On retry, a committed key returns the
+recorded result when available; a conflicting intent is rejected. An
+uncertain unqueryable effect becomes indeterminate rather than automatically
+repeated.
+
+\section{Formal Execution Checklist}
+\label{app:checklist}
+
+\begin{enumerate}
+  \item Resolve every requested Hugging Face and Git revision to an immutable
+  commit; record upstream hashes for any dataset mirror.
+  \item Run protocol unit tests and configuration validation. Confirm the
+  formal root, no sample limit, native inference, and disabled test access.
+  \item Download official assets to the persistent AutoDL data disk. Retain
+  licenses and unmodified manifests.
+  \item Generate train-split native rollouts, fit estimator heads, and select
+  thresholds on development data only.
+  \item Freeze model, prompt, adapter, policy, threshold, trace, and seed
+  manifests. Hash the complete formal configuration.
+  \item Execute E1--E4 on complete official partitions in fixed task order.
+  Append E5--E7 only under their declared dependencies and budget.
+  \item Aggregate JSONL records mechanically, run paired uncertainty tests and
+  Holm correction, and populate tables from the emitted machine-readable
+  summary.
+  \item Audit every numeric statement against its result record and every
+  citation against its bibliographic source before removing the
+  pre-experimental banner.
+\end{enumerate}
+
+\section{Reporting Fields}
+\label{app:reporting}
+
+For each method--benchmark cell, the result artifact contains the denominator,
+task identifiers, seeds, success or reward, environment steps, invalid calls,
+edge and cloud tokens, per-component latency, packet and patch bytes, switches,
+packet validation status, effect transitions, peak memory, and exit reason.
+Exclusions require a machine-readable reason and remain visible in the
+denominator report. Crash and timeout rates are reported rather than silently
+retried until success.
+
+For each learned estimator, the artifact additionally records the fixed
+feature schema, training split and trace-manifest hashes, regularization,
+calibration error on development data, chosen constraints, and all candidate
+predictions at decision time. This permits off-policy inspection of routing
+reversals without granting the policy access to realized test outcomes.
+
+\bibliographystyle{plainnat}
+\bibliography{references}
+
+\end{document}

@@ -1,0 +1,97 @@
+version: "0.5.0"
+project:
+  title: "AgentRelay v2: Evidence-Carrying Semantic Continuations for Risk-Bounded Edge-Cloud Handoffs"
+  short_name: "AgentRelay"
+  root: "."
+target_venue:
+  name: "MLSys"
+  year: "2027"
+  mode: "review"
+  status: "provisional"
+stage:
+  current: "implementation"
+  gate: "local_rtx4080_smoke_verified_waiting_for_autodl_4090d"
+  updated_at: "2026-08-04"
+constraints:
+  datasets:
+    public_only: true
+    synthetic_tasks_prohibited: true
+    official_splits_required: true
+    ecosystem: "Hugging Face Datasets"
+  hardware:
+    local_debug: "RTX 4080 Laptop"
+    formal_experiments: "AutoDL RTX 4090D (24 GB)"
+    optimization_target: "RTX 4090D"
+  storage:
+    autodl_data_root: "/root/autodl-tmp/AgentRelay"
+    persistent_assets:
+      - "models"
+      - "datasets"
+      - "runs"
+      - "results"
+  integrity:
+    native_inference_only: true
+    no_test_leakage: true
+    no_prompt_cheating: true
+    no_result_tampering: true
+artifacts:
+  project_brief: "docs/project-brief.md"
+  idea_optimization: "docs/idea-optimization-20260804.md"
+  experimental_rules: "docs/experimental-rules.md"
+  novelty_map: "literature/literature-search-20260803-agentrelay/papers.md"
+  adjacent_mechanism_map: "literature/literature-search-20260804-agentrelay-adjacent-mechanisms/papers.md"
+  method_spec: "docs/method-spec.md"
+  experiment_plan: "experiments/experiment-plan.md"
+  implementation: "src/agentrelay/"
+  implemented_methods: "artifacts/local-data/results/implemented-methods-v2.json"
+  software_tests: "tests/"
+  execution_guide: "docs/execution-guide.md"
+  autodl_handoff: "docs/autodl-handoff.md"
+  certified_local_run: "artifacts/local-data/runs/local-smoke-20260804T133757296165Z-1a137502"
+  manuscript: "manuscript/main.tex"
+  bibliography: "manuscript/references.bib"
+  figures: "figures/"
+  tables: "tables/"
+  experiments: "experiments/"
+  reviews: "reviews/"
+  submission: "submission/"
+claims:
+  - id: "C1"
+    type: "system_measurement_and_problem"
+    status: "planned"
+    statement: "Complete ContinuationTax can reverse a model-only route or define a repeatable region where switching is harmful."
+    required_evidence: "Measured encode, transfer, rehydration, closure-check, patch, and effect-wait decomposition; native routing-reversal validation; and a phase diagram over at least two public benchmark/model-network settings."
+  - id: "C2"
+    type: "system_mechanism"
+    status: "planned"
+    statement: "An obligation-closed evidence-carrying continuation with selective predecessor patching preserves heterogeneous-model continuation fidelity more efficiently than summaries or typed deltas without dependency closure."
+    required_evidence: "Forced-handoff closure/fidelity, transfer-size, missing-predecessor detection, patch precision/bytes, downstream success, and component ablations."
+  - id: "C3"
+    type: "method"
+    status: "planned"
+    statement: "A calibrated semi-Markov controller that jointly selects executor, continuation mode, commit mode, and dwell decision improves the success-latency-transfer frontier while meeting predeclared validation risk targets."
+    required_evidence: "Frozen end-to-end comparison against task-level, step-level, cascade, fixed-transfer, and uncalibrated joint baselines plus coverage, risk-violation, abstention, and switch-churn analysis."
+  - id: "C4"
+    type: "reliability_mechanism"
+    status: "planned"
+    statement: "Coupling effect-frontier progress to migration legality reduces duplicate or conflicting mutations beyond a routing-independent transaction barrier."
+    required_evidence: "Failure injection on official sandboxed tools with duplicate/conflicting effects, final-state correctness, migration-mask decisions, reconciliation, and recovery-latency metrics."
+experiments:
+  - id: "SW-CHECK"
+    scope: "software_correctness_only"
+    status: "passed"
+    result: "35 unit tests and source compilation passed; 12 routing methods and 7 continuation codecs implemented; no benchmark or paper result produced"
+  - id: "E0"
+    scope: "local_diagnostic"
+    status: "passed_non_evidence"
+    result: "One native Qwen2.5-1.5B inference on public AgentProcessBench bfcl/test input prefix passed 16 independent integrity checks, semantic protocol v2, selective patch, effect frontier, and a route-reversal fixture on RTX 4080 Laptop; paper_evidence=false"
+  - id: "E1-E7"
+    scope: "formal_autodl"
+    status: "waiting_for_autodl_4090d_environment_profile_and_official_dev_gates"
+reviews: []
+revision_ledger:
+  path: "reviews/revision-ledger.md"
+  status: "not_started"
+submission_checks:
+  path: "submission/checks.md"
+  status: "not_started"
