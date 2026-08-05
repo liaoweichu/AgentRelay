@@ -8,7 +8,7 @@ official repository revision in the experiment configuration.
 from __future__ import annotations
 
 import ast
-from dataclasses import dataclass, replace
+from dataclasses import dataclass, field, replace
 from pathlib import Path
 import re
 from typing import Any, Mapping, Sequence
@@ -29,6 +29,8 @@ from .schema import (
     InvariantState,
     PlanState,
     RelayStatePacket,
+    SemanticNode,
+    SemanticNodeType,
     TaskIdentity,
     WorldState,
     goal_digest,
@@ -63,6 +65,14 @@ class _ObservableState:
     steps: int = 0
     reward: float = 0.0
     done: bool = False
+    # Readable action -> observation history, in execution order.  Storing the
+    # readable action text (not just a hash) lets the continuation carry the
+    # full visited-state trajectory so a model cannot loop on stale state.
+    history: list[tuple[str, str]] = field(default_factory=list)
+
+    def record(self, action: str, observation_text: str) -> None:
+        self.history.append((action, observation_text))
+        self.last_action = action
 
 
 class ObservableOfficialAdapter(PublicBenchmarkAdapter):
@@ -81,6 +91,7 @@ class ObservableOfficialAdapter(PublicBenchmarkAdapter):
             "benchmark": self.descriptor.dataset_id,
             "step_index": self.state.steps,
             "valid_actions": list(observation.valid_actions if observation else ()),
+            "last_action": self.state.last_action,
             "last_action_hash": sha256_text(self.state.last_action) if self.state.last_action else "",
         }
 
@@ -90,6 +101,25 @@ class ObservableOfficialAdapter(PublicBenchmarkAdapter):
             raise RuntimeError("reset the official environment before building a packet")
         goal_span = self.trace_store.add(self.state.goal)
         observation_span = self.trace_store.add(observation.text)
+        history_nodes: list[SemanticNode] = []
+        history_spans: list[str] = []
+        for index, (action, text) in enumerate(self.state.history):
+            span = self.trace_store.add(text)
+            history_spans.append(span)
+            history_nodes.append(
+                SemanticNode.create(
+                    SemanticNodeType.WORLD_STATE,
+                    {
+                        "step_index": index,
+                        "action": action,
+                        "observation": text,
+                        "resources": dict(observation.resources),
+                    },
+                    world_version=observation.observation_version,
+                    trace_ref=span,
+                    provenance_hash=sha256_json({"action": action, "observation": text}),
+                )
+            )
         nodes, edges, obligations = build_standard_semantic_graph(
             goal={"instruction": self.state.goal},
             observation={
@@ -103,6 +133,7 @@ class ObservableOfficialAdapter(PublicBenchmarkAdapter):
             observation_trace_ref=observation_span,
             goal_provenance_hash=sha256_text(self.state.goal),
             observation_provenance_hash=sha256_text(observation.text),
+            extra_nodes=history_nodes,
         )
         effects = self.effect_ledger.snapshot()
         packet = RelayStatePacket(
@@ -147,7 +178,7 @@ class ObservableOfficialAdapter(PublicBenchmarkAdapter):
                 pending_actions=("native_model_generate", "official_environment_step"),
             ),
             effects=effects,
-            trace_refs=(goal_span, observation_span),
+            trace_refs=(goal_span, observation_span, *history_spans),
             parent_packet_hash=previous.packet_hash if previous is not None else "",
             acknowledged_version=previous.packet_hash if previous is not None else "",
             obligation_ids=obligations,
@@ -234,9 +265,9 @@ class ALFWorldAdapter(ObservableOfficialAdapter):
             for item in (_mapping_value(self._info, "admissible_commands", ()) or ())
         )
         self.state.steps += 1
-        self.state.last_action = action
         self.state.reward = reward
         self.state.done = done
+        self.state.record(action, text)
         self.state.observation = BenchmarkObservation(
             text=text,
             observation_version=f"step-{self.state.steps}",
@@ -341,9 +372,9 @@ class WebShopAdapter(ObservableOfficialAdapter):
         text, reward, done, info = self._env.step(action)
         self._final_reward = float(reward)
         self.state.steps += 1
-        self.state.last_action = action
         self.state.reward = float(reward)
         self.state.done = bool(done)
+        self.state.record(action, str(text))
         self.state.observation = BenchmarkObservation(
             text=str(text),
             observation_version=f"step-{self.state.steps}",
@@ -487,8 +518,8 @@ class AppWorldAdapter(ObservableOfficialAdapter):
     def step(self, action: str) -> BenchmarkStepResult:
         output = str(self._world.execute(action))
         self.state.steps += 1
-        self.state.last_action = action
         self.state.done = bool(self._world.task_completed())
+        self.state.record(action, output)
         self.state.observation = BenchmarkObservation(
             text=output,
             observation_version=f"step-{self.state.steps}",

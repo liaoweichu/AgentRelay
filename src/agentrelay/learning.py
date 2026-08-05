@@ -82,6 +82,10 @@ class RouterTrainingRow:
     inference_ms: float
     controller_ms: float
     handoff: HandoffMeasurement
+    # Continuous episode reward (e.g. WebShop reward in [0, 1]).  Kept alongside
+    # the binary success flag so the router can be trained on a reward-optimal
+    # objective rather than discarding the graded signal to a hard 0/1.
+    reward: float = 0.0
 
     def validate(self, authorized_train_splits: set[str]) -> None:
         require_immutable_revision(self.dataset_revision, subject=self.dataset_id)
@@ -91,6 +95,8 @@ class RouterTrainingRow:
             raise ValueError(f"split {self.split!r} is not authorized for router fitting")
         if self.success not in {0, 1} or self.fidelity_pass not in {0, 1}:
             raise ValueError("success and fidelity_pass must be binary")
+        if not (0.0 <= self.reward <= 1.0):
+            raise ValueError("reward must lie in [0, 1]")
         if self.step_index < 0:
             raise ValueError("step_index cannot be negative")
         feature_vector(self.features)
@@ -117,6 +123,7 @@ class RouterTrainingRow:
             inference_ms=float(value["inference_ms"]),
             controller_ms=float(value.get("controller_ms", 0.0)),
             handoff=HandoffMeasurement(**handoff),
+            reward=float(value.get("reward", 0.0)),
         )
 
     def to_dict(self) -> dict[str, Any]:
@@ -146,6 +153,7 @@ class _ConstantProbability:
 class _ActionPredictor:
     success_model: Any
     fidelity_model: Any
+    reward_model: Any
     regressors: Mapping[str, Any]
 
 
@@ -223,6 +231,7 @@ class JointRouterEstimator:
             x = np.asarray([feature_vector(row.features) for row in action_rows], dtype=float)
             success = np.asarray([row.success for row in action_rows], dtype=int)
             fidelity = np.asarray([row.fidelity_pass for row in action_rows], dtype=int)
+            reward = np.asarray([row.reward for row in action_rows], dtype=float)
             regressors = {}
             for target in targets:
                 if hasattr(action_rows[0], target):
@@ -233,6 +242,7 @@ class JointRouterEstimator:
             self.predictors[key] = _ActionPredictor(
                 success_model=self._fit_probability(x, success),
                 fidelity_model=self._fit_probability(x, fidelity),
+                reward_model=self._fit_regressor(x, reward),
                 regressors=regressors,
             )
 
@@ -267,7 +277,10 @@ class JointRouterEstimator:
             estimates.append(
                 CandidateEstimate(
                     action=action_from_key(key),
-                    predicted_success=float(predictor.success_model.predict_proba(x)[0, 1]),
+                    # Reward-optimal: maximize the predicted continuous reward
+                    # (WebShop reward is normalized to [0, 1]) rather than the
+                    # sparse hard-success probability.
+                    predicted_success=min(1.0, max(0.0, float(predictor.reward_model.predict(x)[0]))),
                     predicted_fidelity=float(predictor.fidelity_model.predict_proba(x)[0, 1]),
                     inference_ms=predicted["inference_ms"],
                     controller_ms=predicted["controller_ms"],

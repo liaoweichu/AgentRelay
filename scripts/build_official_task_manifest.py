@@ -16,6 +16,15 @@ from agentrelay.formal_matrix import FormalTask, write_task_manifest  # noqa: E4
 from agentrelay.inference import require_immutable_revision  # noqa: E402
 
 
+# Official WebShop instruction-split cardinalities (Yao et al., NeurIPS 2022).
+# The reported protocol uses 10,587 / 1,000 / 500 train / dev / test goals.
+WEBSHOP_OFFICIAL_SPLIT_SIZES = {
+    "train": 10587,
+    "dev": 1000,
+    "test": 500,
+}
+
+
 def main() -> int:
     parser = argparse.ArgumentParser()
     parser.add_argument("--benchmark", choices=("alfworld", "webshop", "appworld"), required=True)
@@ -26,11 +35,15 @@ def main() -> int:
     parser.add_argument("--alfworld-config")
     parser.add_argument("--train-eval")
     parser.add_argument("--webshop-file-path")
+    parser.add_argument("--webshop-human-goals", type=int, default=1)
     parser.add_argument("--sample-count", type=int, default=None)
     parser.add_argument("--sample-seed", type=int, default=20260805)
     args = parser.parse_args()
     require_immutable_revision(args.revision, subject=args.benchmark)
     tasks: list[FormalTask] = []
+    # ALFWorld and AppWorld enumerate the complete official split by
+    # construction; WebShop may produce a sampled diagnostic subset instead.
+    complete = True
 
     if args.benchmark == "alfworld":
         if not args.alfworld_config or not args.train_eval:
@@ -59,7 +72,10 @@ def main() -> int:
             from web_agent_site.envs.web_agent_text_env import WebAgentTextEnv
         except ImportError as exc:
             raise RuntimeError("install the pinned official WebShop environment") from exc
-        kwargs = {"observation_mode": "text", "human_goals": 1}
+        kwargs = {
+            "observation_mode": "text",
+            "human_goals": args.webshop_human_goals,
+        }
         if args.webshop_file_path:
             kwargs["file_path"] = args.webshop_file_path
         env = WebAgentTextEnv(**kwargs)
@@ -75,8 +91,19 @@ def main() -> int:
             indices = sorted(
                 random.Random(args.sample_seed).sample(range(count), args.sample_count)
             )
+            # A deterministic subset is a diagnostic sample, never the complete
+            # official split, so it must not be attested as complete.
+            complete = False
         else:
             indices = range(count)
+            expected = WEBSHOP_OFFICIAL_SPLIT_SIZES.get(args.split)
+            if expected is not None and count != expected:
+                raise ValueError(
+                    f"WebShop split {args.split!r} must contain exactly {expected} "
+                    f"official goals, but the loaded environment exposed {count}; "
+                    f"check --webshop-file-path and --webshop-human-goals"
+                )
+            complete = True
         for index in indices:
             tasks.append(
                 FormalTask(
@@ -107,7 +134,7 @@ def main() -> int:
         args.output,
         dataset_revision=args.revision,
         tasks=tasks,
-        complete_official_split=True,
+        complete_official_split=complete,
     )
     print(f"benchmark={args.benchmark} split={args.split} tasks={len(tasks)} output={target}")
     return 0

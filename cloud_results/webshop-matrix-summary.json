@@ -1,0 +1,43 @@
+{
+  "edge_only": {
+    "episodes": 200,
+    "success_rate": 0.08,
+    "mean_reward": 0.274
+  },
+  "cloud_only": {
+    "episodes": 200,
+    "success_rate": 0.1,
+    "mean_reward": 0.2679
+  },
+  "agentrouter_style": {
+    "episodes": 200,
+    "success_rate": 0.08,
+    "mean_reward": 0.274
+  },
+  "hera_agreement": {
+    "episodes": 200,
+    "success_rate": 0.1,
+    "mean_reward": 0.2679
+  },
+  "full_replay_step": {
+    "episodes": 200,
+    "success_rate": 0.08,
+    "mean_reward": 0.274
+  },
+  "uncalibrated_joint": {
+    "episodes": 200,
+    "success_rate": 0.08,
+    "mean_reward": 0.274
+  },
+  "agentrelay": {
+    "episodes": 200,
+    "success_rate": 0.08,
+    "mean_reward": 0.274
+  },
+  "_meta": {
+    "run_id": "formal-matrix-20260805T032846499401Z-f8337838",
+    "valid_episodes": 1400,
+    "expected_episodes": 1400,
+    "problems": []
+  }
+}

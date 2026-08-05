@@ -40,6 +40,11 @@ class NativeGenerationConfig:
     seed: int = 0
     trust_remote_code: bool = False
     local_files_only: bool = False
+    # Gemma 4 family: E2B loads as a causal LM with a tokenizer, while the 12B
+    # model uses the multimodal architecture backed by an AutoProcessor and
+    # AutoModelForMultimodalLM.  enable_thinking=... controls the reasoning mode.
+    architecture: str = "causal_lm"
+    enable_thinking: bool = True
 
     def validate(self) -> None:
         if not self.model_id or "/" not in self.model_id:
@@ -49,6 +54,8 @@ class NativeGenerationConfig:
             raise ValueError(f"unsupported dtype: {self.dtype}")
         if self.quantization not in {"none", "bnb_4bit", "bnb_8bit", "repository"}:
             raise ValueError(f"unsupported quantization: {self.quantization}")
+        if self.architecture not in {"causal_lm", "multimodal_lm", "gemma_causal_lm"}:
+            raise ValueError(f"unsupported architecture: {self.architecture}")
         if self.max_new_tokens <= 0:
             raise ValueError("max_new_tokens must be positive")
         if self.do_sample and self.temperature <= 0:
@@ -97,6 +104,8 @@ class HFModelExecutor:
             import torch
             from transformers import (
                 AutoModelForCausalLM,
+                AutoModelForMultimodalLM,
+                AutoProcessor,
                 AutoTokenizer,
                 BitsAndBytesConfig,
             )
@@ -107,13 +116,21 @@ class HFModelExecutor:
         self.config = config
         self.storage = storage
         self.torch = torch
+        # Gemma 4 family: E4B is a gated-modal causal LM that still needs an
+        # AutoProcessor (not AutoTokenizer); 12B Unified uses the multimodal LM
+        # adapter.  Both route reasoning through enable_thinking.
+        self._uses_processor = config.architecture in {"multimodal_lm", "gemma_causal_lm"}
+        self._uses_thinking = config.architecture in {"multimodal_lm", "gemma_causal_lm"}
         common: dict[str, Any] = {
             "revision": config.revision,
             "cache_dir": str(storage.models),
             "trust_remote_code": config.trust_remote_code,
             "local_files_only": config.local_files_only,
         }
-        self.tokenizer = AutoTokenizer.from_pretrained(config.model_id, **common)
+        if self._uses_processor:
+            self.tokenizer = AutoProcessor.from_pretrained(config.model_id, **common)
+        else:
+            self.tokenizer = AutoTokenizer.from_pretrained(config.model_id, **common)
 
         model_kwargs = dict(common)
         model_kwargs["device_map"] = config.device_map
@@ -131,7 +148,16 @@ class HFModelExecutor:
         elif config.quantization == "bnb_8bit":
             model_kwargs["quantization_config"] = BitsAndBytesConfig(load_in_8bit=True)
         # "repository" leaves quantization to the pinned repository config.
-        self.model = AutoModelForCausalLM.from_pretrained(config.model_id, **model_kwargs)
+        # Both Gemma 4 variants (E4B -> Gemma4ForConditionalGeneration and
+        # 12B -> Gemma4UnifiedForConditionalGeneration) are multimodal models
+        # that register under AutoModelForMultimodalLM.  "gemma_causal_lm" is
+        # kept as an alias for configs that named the E4B model that way.
+        model_cls = (
+            AutoModelForMultimodalLM
+            if config.architecture in {"multimodal_lm", "gemma_causal_lm"}
+            else AutoModelForCausalLM
+        )
+        self.model = model_cls.from_pretrained(config.model_id, **model_kwargs)
         self.model.eval()
 
     def _input_device(self) -> Any:
@@ -151,12 +177,17 @@ class HFModelExecutor:
                 raise ValueError(f"unsupported chat role: {role!r}")
             normalized.append({"role": role, "content": content})
 
-        prompt = self.tokenizer.apply_chat_template(
-            normalized,
-            tokenize=False,
-            add_generation_prompt=True,
-        )
-        encoded = self.tokenizer(prompt, return_tensors="pt")
+        template_kwargs: dict[str, Any] = {
+            "tokenize": False,
+            "add_generation_prompt": True,
+        }
+        if self._uses_thinking:
+            template_kwargs["enable_thinking"] = self.config.enable_thinking
+        prompt = self.tokenizer.apply_chat_template(normalized, **template_kwargs)
+        if self._uses_processor:
+            encoded = self.tokenizer(text=prompt, return_tensors="pt")
+        else:
+            encoded = self.tokenizer(prompt, return_tensors="pt")
         device = self._input_device()
         encoded = {key: value.to(device) for key, value in encoded.items()}
         prompt_tokens = int(encoded["input_ids"].shape[-1])
@@ -170,12 +201,13 @@ class HFModelExecutor:
         generation_kwargs: dict[str, Any] = {
             "max_new_tokens": self.config.max_new_tokens,
             "do_sample": self.config.do_sample,
-            "pad_token_id": (
-                self.tokenizer.pad_token_id
-                if self.tokenizer.pad_token_id is not None
-                else self.tokenizer.eos_token_id
-            ),
         }
+        # Gemma 4 processors do not expose pad_token_id; fall back to eos.
+        pad_id = getattr(self.tokenizer, "pad_token_id", None)
+        if pad_id is None:
+            eos = getattr(self.tokenizer, "eos_token_id", None)
+            pad_id = eos[0] if isinstance(eos, (list, tuple)) else eos
+        generation_kwargs["pad_token_id"] = pad_id
         if self.config.do_sample:
             generation_kwargs.update(
                 temperature=self.config.temperature,

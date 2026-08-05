@@ -35,6 +35,7 @@ def main() -> int:
         if episode.get("labels_accessed_by_router") is not False:
             raise ValueError(f"line {line_number} violates the router label boundary")
         success = int(float(episode.get("success", 0.0)) > 0.0)
+        reward = min(1.0, max(0.0, float(episode.get("reward", 0.0))))
         for step in episode.get("steps", ()):
             features = step.get("router_features", {})
             if not features:
@@ -53,6 +54,7 @@ def main() -> int:
                     CommitMode(step["commit_mode"]),
                 ),
                 success=success,
+                reward=reward,
                 fidelity_pass=1,
                 inference_ms=float(step["inference_ms"]),
                 controller_ms=float(step["controller_ms"]),
