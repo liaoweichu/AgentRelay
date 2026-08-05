@@ -24,9 +24,21 @@ from .official_adapters import ALFWorldAdapter, AppWorldAdapter, WebShopAdapter
 from .policy import ConstrainedUtilityPolicy
 from .provenance import collect_hardware_metadata, source_tree_revision
 from .schema import Executor, canonical_json, sha256_json
+from .webshop_protocol import canonical_webshop_split, validate_webshop_manifest_indices
 
 
 SAFE_ID_RE = re.compile(r"[^A-Za-z0-9_.-]+")
+
+
+def required_model_executors(methods: Iterable[BaselineName | str]) -> tuple[Executor, ...]:
+    """Load one model for a single fixed endpoint; all routers require both."""
+
+    names = tuple(BaselineName(method) for method in methods)
+    if names and set(names) == {BaselineName.EDGE_ONLY}:
+        return (Executor.EDGE,)
+    if names and set(names) == {BaselineName.CLOUD_ONLY}:
+        return (Executor.CLOUD,)
+    return (Executor.EDGE, Executor.CLOUD)
 
 
 @dataclass(frozen=True)
@@ -76,6 +88,33 @@ class OfficialTaskManifest:
         identities = {(task.benchmark, task.split, task.task_id) for task in tasks}
         if len(identities) != len(tasks):
             raise ValueError("task manifest contains duplicate task identities")
+        webshop_groups: dict[str, list[FormalTask]] = {}
+        for task in tasks:
+            if task.benchmark == "webshop":
+                split = canonical_webshop_split(task.split)
+                if split != task.split:
+                    raise ValueError(
+                        f"WebShop manifest must use canonical split {split!r}, got {task.split!r}"
+                    )
+                if task.task_index is None or str(task.task_index) != task.task_id:
+                    raise ValueError(
+                        "WebShop task_id and task_index must be the same official session id"
+                    )
+                expected_purpose = {"train": "train", "dev": "tune", "test": "evaluate"}[
+                    split
+                ]
+                if task.purpose != expected_purpose:
+                    raise ValueError(
+                        f"WebShop {split} tasks require purpose={expected_purpose!r}, "
+                        f"got {task.purpose!r}"
+                    )
+                webshop_groups.setdefault(split, []).append(task)
+        for split, split_tasks in webshop_groups.items():
+            validate_webshop_manifest_indices(
+                split,
+                (int(task.task_index) for task in split_tasks if task.task_index is not None),
+                complete_official_split=bool(value.get("complete_official_split", False)),
+            )
         return cls(
             dataset_revision=str(value["dataset_revision"]),
             complete_official_split=bool(value.get("complete_official_split", False)),
@@ -92,6 +131,16 @@ def write_task_manifest(
     complete_official_split: bool,
 ) -> Path:
     tasks = tuple(tasks)
+    webshop_groups: dict[str, list[FormalTask]] = {}
+    for task in tasks:
+        if task.benchmark == "webshop":
+            webshop_groups.setdefault(canonical_webshop_split(task.split), []).append(task)
+    for split, split_tasks in webshop_groups.items():
+        validate_webshop_manifest_indices(
+            split,
+            (int(task.task_index) for task in split_tasks if task.task_index is not None),
+            complete_official_split=complete_official_split,
+        )
     payload = {
         "schema_version": "1.0",
         "dataset_revision": dataset_revision,
@@ -194,12 +243,14 @@ class FormalMatrixRunner:
                 raise ValueError("AgentRelay requires a validation-only calibration artifact")
         storage = StorageLayout(Path(config["data_root"]).resolve())
         self.storage = storage
+        resident = required_model_executors(self.methods)
         self.executors = {
             role: HFModelExecutor(NativeGenerationConfig.from_dict(model), storage)
             for role, model in (
                 (Executor.EDGE, config["models"]["edge"]),
                 (Executor.CLOUD, config["models"]["cloud"]),
             )
+            if role in resident
         }
         # Shared official benchmark environments (WebShop full corpus) reused
         # across every (task, method) episode to avoid rebuilding the product
@@ -283,12 +334,35 @@ class FormalMatrixRunner:
                         executors=self.executors,
                         controller=BaselineController(
                             method,
-                            policy=ConstrainedUtilityPolicy(switch_hysteresis_ms=5.0),
+                            policy=ConstrainedUtilityPolicy(
+                                switch_hysteresis_ms=float(
+                                    self.config.get("controller", {}).get(
+                                        "switch_hysteresis_ms", 5.0
+                                    )
+                                ),
+                                success_weight=float(
+                                    self.config.get("controller", {}).get(
+                                        "reward_weight_ms", 10_000.0
+                                    )
+                                ),
+                                selection_mode=(
+                                    "scalarized_utility"
+                                    if method
+                                    in {
+                                        BaselineName.UNCALIBRATED_JOINT,
+                                        BaselineName.AGENTRELAY,
+                                    }
+                                    else "constrained_cost"
+                                ),
+                            ),
                         ),
                         estimate_provider=self._provider(method),
                         max_steps=int(self.config["benchmarks"][task.benchmark]["max_steps"]),
                         minimum_dwell_steps=int(
                             self.config.get("controller", {}).get("minimum_dwell_steps", 2)
+                        ),
+                        max_action_retries=int(
+                            self.config.get("controller", {}).get("max_action_retries", 1)
                         ),
                         paper_evidence=True,
                     )
@@ -327,6 +401,7 @@ class FormalMatrixRunner:
                 for role, value in self.config["models"].items()
             },
             "methods": [method.value for method in self.methods],
+            "resident_executors": [executor.value for executor in self.executors],
             "results": written,
             "hardware": collect_hardware_metadata(),
             "labels_accessed_by_router": False,

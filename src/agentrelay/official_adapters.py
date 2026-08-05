@@ -14,6 +14,7 @@ import re
 from typing import Any, Mapping, Sequence
 
 from .benchmark import (
+    ActionValidation,
     BenchmarkEvaluation,
     BenchmarkObservation,
     BenchmarkStepResult,
@@ -38,6 +39,7 @@ from .schema import (
     sha256_text,
 )
 from .state import TraceStore
+from .webshop_protocol import check_webshop_action, webshop_fallback_action
 
 
 def _first(value: Any, default: Any = None) -> Any:
@@ -69,10 +71,19 @@ class _ObservableState:
     # readable action text (not just a hash) lets the continuation carry the
     # full visited-state trajectory so a model cannot loop on stale state.
     history: list[tuple[str, str]] = field(default_factory=list)
+    attempted_transitions: dict[str, set[str]] = field(default_factory=dict)
 
     def record(self, action: str, observation_text: str) -> None:
         self.history.append((action, observation_text))
         self.last_action = action
+
+    def note_attempt(self, observation: BenchmarkObservation, action: str) -> None:
+        self.attempted_transitions.setdefault(observation.environment_digest, set()).add(
+            action.strip().lower()
+        )
+
+    def attempted_actions(self, observation: BenchmarkObservation) -> tuple[str, ...]:
+        return tuple(sorted(self.attempted_transitions.get(observation.environment_digest, ())))
 
 
 class ObservableOfficialAdapter(PublicBenchmarkAdapter):
@@ -356,39 +367,79 @@ class WebShopAdapter(ObservableOfficialAdapter):
         value = self._env.reset(session=self._session)
         text = str(_first(value, ""))
         goal = str(getattr(self._env, "instruction_text", ""))
+        valid_actions = self._valid_actions()
         self.state = _ObservableState(
             goal=goal,
             observation=BenchmarkObservation(
                 text=text,
                 observation_version="step-0",
-                environment_digest=sha256_json({"session": self._session, "text": text}),
+                environment_digest=sha256_json(
+                    {
+                        "session": self._session,
+                        "text": text,
+                        "valid_actions": list(valid_actions),
+                    }
+                ),
                 resources={"session": self._session, "human_goals": True},
-                valid_actions=self._valid_actions(),
+                valid_actions=valid_actions,
             ),
         )
         return self.state.observation
 
     def step(self, action: str) -> BenchmarkStepResult:
+        if self.state.observation is None:
+            raise RuntimeError("reset WebShop before stepping")
+        self.state.note_attempt(self.state.observation, action)
         text, reward, done, info = self._env.step(action)
         self._final_reward = float(reward)
         self.state.steps += 1
         self.state.reward = float(reward)
         self.state.done = bool(done)
         self.state.record(action, str(text))
+        valid_actions = self._valid_actions() if not done else ()
         self.state.observation = BenchmarkObservation(
             text=str(text),
             observation_version=f"step-{self.state.steps}",
             environment_digest=sha256_json(
-                {"session": self._session, "step": self.state.steps, "text": str(text)}
+                {
+                    "session": self._session,
+                    "text": str(text),
+                    "valid_actions": list(valid_actions),
+                }
             ),
             resources={"session": self._session, "reward": float(reward)},
-            valid_actions=self._valid_actions() if not done else (),
+            valid_actions=valid_actions,
             done=bool(done),
         )
         return BenchmarkStepResult(
             self.state.observation,
             float(reward),
             info if isinstance(info, Mapping) else {},
+        )
+
+    def validate_model_action(
+        self,
+        action: str,
+        observation: BenchmarkObservation,
+    ) -> ActionValidation:
+        checked = check_webshop_action(
+            action,
+            observation.valid_actions,
+            attempted_actions=self.state.attempted_actions(observation),
+        )
+        return ActionValidation(checked.action, checked.accepted, checked.feedback)
+
+    def fallback_model_action(
+        self,
+        observation: BenchmarkObservation,
+        rejected_actions: Sequence[str],
+    ) -> str | None:
+        attempted = set(self.state.attempted_actions(observation))
+        attempted.update(str(action).strip().lower() for action in rejected_actions)
+        return webshop_fallback_action(
+            observation.valid_actions,
+            goal=self.state.goal,
+            attempted_actions=attempted,
         )
 
     def evaluate(self) -> BenchmarkEvaluation:

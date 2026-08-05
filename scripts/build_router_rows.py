@@ -16,6 +16,7 @@ from agentrelay.cost import HandoffMeasurement  # noqa: E402
 from agentrelay.learning import RouterTrainingRow  # noqa: E402
 from agentrelay.policy import CandidateAction  # noqa: E402
 from agentrelay.schema import CommitMode, Executor, TransferMode, canonical_json  # noqa: E402
+from agentrelay.router_data import task_router_training_rows  # noqa: E402
 
 
 def main() -> int:
@@ -23,15 +24,43 @@ def main() -> int:
     parser.add_argument("episodes", help="JSONL from native official-train episodes")
     parser.add_argument("output")
     parser.add_argument("--train-split", action="append", required=True)
+    parser.add_argument("--granularity", choices=("task", "step"), default="task")
+    parser.add_argument(
+        "--allow-episode-reward-replication",
+        action="store_true",
+        help=(
+            "explicitly opt into legacy step rows that repeat endpoint reward; "
+            "never use this mode for the task-router learnability gate"
+        ),
+    )
     args = parser.parse_args()
+    if args.granularity == "step" and not args.allow_episode_reward_replication:
+        raise ValueError(
+            "step granularity repeats episode reward across correlated steps; "
+            "pass --allow-episode-reward-replication only for a deliberate legacy diagnostic"
+        )
     allowed = set(args.train_split)
-    rows: list[RouterTrainingRow] = []
-    for line_number, line in enumerate(Path(args.episodes).read_text(encoding="utf-8").splitlines(), 1):
-        if not line.strip():
+    episodes = []
+    for line_number, line in enumerate(
+        Path(args.episodes).read_text(encoding="utf-8").splitlines(), 1
+    ):
+        if line.strip():
+            episode = json.loads(line)
+            if episode.get("split") not in allowed:
+                raise ValueError(f"line {line_number} is not from an authorized train split")
+            episodes.append(episode)
+    if args.granularity == "task":
+        rows = list(
+            task_router_training_rows(
+                episodes,
+                authorized_train_splits=allowed,
+            )
+        )
+    else:
+        rows = []
+    for line_number, episode in enumerate(episodes, 1):
+        if args.granularity != "step":
             continue
-        episode = json.loads(line)
-        if episode.get("split") not in allowed:
-            raise ValueError(f"line {line_number} is not from an authorized train split")
         if episode.get("labels_accessed_by_router") is not False:
             raise ValueError(f"line {line_number} violates the router label boundary")
         success = int(float(episode.get("success", 0.0)) > 0.0)
@@ -90,4 +119,3 @@ def main() -> int:
 
 if __name__ == "__main__":
     raise SystemExit(main())
-

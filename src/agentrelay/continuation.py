@@ -274,7 +274,24 @@ def render_semantic_continuation(packet: RelayStatePacket, *, style: str = "json
 
     if style not in {"json", "concise_text"}:
         raise ValueError(f"unsupported continuation rendering: {style}")
-    nodes = sorted(packet.semantic_nodes, key=lambda node: (node.node_type.value, node.node_id))
+    def node_order(node: SemanticNode) -> tuple[int, int, str]:
+        type_order = {
+            SemanticNodeType.GOAL_CONSTRAINT: 0,
+            SemanticNodeType.WORLD_STATE: 1,
+            SemanticNodeType.EVIDENCE: 2,
+            SemanticNodeType.TRACE_SPAN: 3,
+            SemanticNodeType.EFFECT_RECORD: 4,
+            SemanticNodeType.PLAN_OBLIGATION: 5,
+        }
+        step = 10**9
+        if isinstance(node.value, Mapping) and "step_index" in node.value:
+            try:
+                step = int(node.value["step_index"])
+            except (TypeError, ValueError):
+                pass
+        return type_order.get(node.node_type, 99), step, node.node_id
+
+    nodes = sorted(packet.semantic_nodes, key=node_order)
     if style == "json":
         return canonical_json(
             {

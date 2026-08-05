@@ -19,7 +19,7 @@ from .policy import CandidateAction, CandidateEstimate
 from .schema import CommitMode, Executor, TransferMode, canonical_json, sha256_json
 
 
-FEATURE_NAMES = (
+BASE_FEATURE_NAMES = (
     "step_index",
     "remaining_steps",
     "input_tokens",
@@ -41,6 +41,19 @@ FEATURE_NAMES = (
     "effect_frontier_blocked",
     "consecutive_steps",
     "dwell_remaining",
+)
+GOAL_HASH_DIMENSIONS = 32
+GOAL_HASH_FEATURE_NAMES = tuple(
+    f"goal_hash_{index:02d}" for index in range(GOAL_HASH_DIMENSIONS)
+)
+FEATURE_NAMES = (
+    *BASE_FEATURE_NAMES,
+    "goal_char_count",
+    "goal_token_count",
+    "goal_numeric_count",
+    "goal_constraint_count",
+    "visible_action_count",
+    *GOAL_HASH_FEATURE_NAMES,
 )
 
 
@@ -248,7 +261,7 @@ class JointRouterEstimator:
 
         datasets = sorted({(row.dataset_id, row.dataset_revision, row.split) for row in rows})
         self.metadata = {
-            "schema_version": "1.0",
+            "schema_version": "2.0",
             "trained_at": datetime.now(timezone.utc).isoformat(),
             "feature_names": list(FEATURE_NAMES),
             "row_count": len(rows),
@@ -256,6 +269,10 @@ class JointRouterEstimator:
             "authorized_train_splits": sorted(authorized),
             "datasets": [list(item) for item in datasets],
             "training_rows_hash": sha256_json([row.to_dict() for row in rows]),
+            "quality_target": "continuous_episode_reward",
+            "independent_task_count": len(
+                {(row.dataset_id, row.dataset_revision, row.split, row.sample_id) for row in rows}
+            ),
         }
         return self
 
@@ -277,12 +294,12 @@ class JointRouterEstimator:
             estimates.append(
                 CandidateEstimate(
                     action=action_from_key(key),
-                    # Reward-optimal: maximize the predicted continuous reward
-                    # (WebShop reward is normalized to [0, 1]) rather than the
-                    # sparse hard-success probability.
-                    predicted_success=min(1.0, max(0.0, float(predictor.reward_model.predict(x)[0]))),
+                    predicted_success=float(predictor.success_model.predict_proba(x)[0, 1]),
                     predicted_fidelity=float(predictor.fidelity_model.predict_proba(x)[0, 1]),
                     inference_ms=predicted["inference_ms"],
+                    predicted_reward=min(
+                        1.0, max(0.0, float(predictor.reward_model.predict(x)[0]))
+                    ),
                     controller_ms=predicted["controller_ms"],
                     handoff=HandoffMeasurement(
                         encode_ms=predicted["encode_ms"],
@@ -302,6 +319,18 @@ class JointRouterEstimator:
                 )
             )
         return tuple(estimates)
+
+    def predicted_reward_by_executor(
+        self, features: Mapping[str, float]
+    ) -> dict[Executor, float]:
+        """Return the best learned endpoint reward for each executor."""
+
+        result: dict[Executor, float] = {}
+        for estimate in self.candidates(features):
+            value = estimate.quality_score
+            executor = estimate.action.executor
+            result[executor] = max(result.get(executor, 0.0), value)
+        return result
 
     def save(self, path: str | Path) -> None:
         if not self.predictors:

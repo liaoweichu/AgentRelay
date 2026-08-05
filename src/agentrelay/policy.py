@@ -41,6 +41,7 @@ class CandidateEstimate:
     predicted_success: float
     predicted_fidelity: float
     inference_ms: float
+    predicted_reward: float | None = None
     inference_tokens: int = 0
     controller_ms: float = 0.0
     handoff: HandoffMeasurement = HandoffMeasurement()
@@ -68,6 +69,16 @@ class CandidateEstimate:
             self.fidelity_lower_bound
             if self.fidelity_lower_bound is not None
             else self.predicted_fidelity
+        )
+
+    @property
+    def quality_score(self) -> float:
+        """Continuous task quality when available, otherwise success probability."""
+
+        return (
+            float(self.predicted_reward)
+            if self.predicted_reward is not None
+            else self.conservative_success
         )
 
     @property
@@ -180,7 +191,7 @@ class ConstrainedUtilityPolicy:
         )
 
     def _utility(self, estimate: CandidateEstimate, context: RoutingContext) -> float:
-        return self.success_weight * estimate.conservative_success - self._cost(estimate, context)
+        return self.success_weight * estimate.quality_score - self._cost(estimate, context)
 
     def select(
         self,
@@ -295,4 +306,3 @@ def routing_reversal(
     measured = policy.select(estimates, context)
     zero_tax = policy.select_without_continuation_tax(estimates, context)
     return measured.selected.action != zero_tax.selected.action, measured, zero_tax
-

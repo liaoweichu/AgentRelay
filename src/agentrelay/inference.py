@@ -104,7 +104,6 @@ class HFModelExecutor:
             import torch
             from transformers import (
                 AutoModelForCausalLM,
-                AutoModelForMultimodalLM,
                 AutoProcessor,
                 AutoTokenizer,
                 BitsAndBytesConfig,
@@ -152,11 +151,17 @@ class HFModelExecutor:
         # 12B -> Gemma4UnifiedForConditionalGeneration) are multimodal models
         # that register under AutoModelForMultimodalLM.  "gemma_causal_lm" is
         # kept as an alias for configs that named the E4B model that way.
-        model_cls = (
-            AutoModelForMultimodalLM
-            if config.architecture in {"multimodal_lm", "gemma_causal_lm"}
-            else AutoModelForCausalLM
-        )
+        if config.architecture in {"multimodal_lm", "gemma_causal_lm"}:
+            try:
+                from transformers import AutoModelForMultimodalLM
+            except ImportError as exc:
+                raise RuntimeError(
+                    "this Gemma 4 architecture requires a Transformers build with "
+                    "AutoModelForMultimodalLM support"
+                ) from exc
+            model_cls = AutoModelForMultimodalLM
+        else:
+            model_cls = AutoModelForCausalLM
         self.model = model_cls.from_pretrained(config.model_id, **model_kwargs)
         self.model.eval()
 

@@ -47,6 +47,13 @@ class BenchmarkEvaluation:
     official_metrics: Mapping[str, float] = field(default_factory=dict)
 
 
+@dataclass(frozen=True)
+class ActionValidation:
+    action: str
+    accepted: bool
+    feedback: str = ""
+
+
 class PublicBenchmarkAdapter(ABC):
     """Minimal boundary that keeps official data and evaluators authoritative."""
 
@@ -119,6 +126,27 @@ class PublicBenchmarkAdapter(ABC):
         if value.lower().startswith("action:"):
             value = value.split(":", 1)[1].strip()
         return value.splitlines()[0].strip()
+
+    def validate_model_action(
+        self,
+        action: str,
+        observation: BenchmarkObservation,
+    ) -> ActionValidation:
+        """Validate an action against public state before environment execution."""
+
+        del observation
+        value = str(action).strip()
+        return ActionValidation(value, bool(value), "model returned an empty action")
+
+    def fallback_model_action(
+        self,
+        observation: BenchmarkObservation,
+        rejected_actions: Sequence[str],
+    ) -> str | None:
+        """Optional deterministic public-state fallback after model retries."""
+
+        del observation, rejected_actions
+        return None
 
     def close(self) -> None:
         """Release official-environment resources when supported."""

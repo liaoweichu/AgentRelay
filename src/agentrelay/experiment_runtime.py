@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from dataclasses import asdict, dataclass, replace
+import re
 import time
 from typing import Any, Callable, Mapping, Protocol
 
@@ -12,11 +13,19 @@ from .calibration import ConformalRiskCalibrator
 from .continuation import closure_depth, render_semantic_continuation
 from .cost import HandoffMeasurement
 from .effects import EffectLedger, build_effect_frontier
-from .inference import HFModelExecutor, NativeGenerationResult
-from .learning import FEATURE_NAMES, JointRouterEstimator
+from .inference import NativeGenerationResult
+from .learning import FEATURE_NAMES, GOAL_HASH_DIMENSIONS, JointRouterEstimator
 from .policy import CandidateAction, CandidateEstimate, RoutingContext
 from .runtime import HandoffCoordinator, HandoffTransaction
-from .schema import CommitMode, EffectClass, Executor, RelayStatePacket, TransferMode, sha256_text
+from .schema import (
+    CommitMode,
+    EffectClass,
+    Executor,
+    RelayStatePacket,
+    SemanticNodeType,
+    TransferMode,
+    sha256_text,
+)
 from .validation import PacketValidator
 
 
@@ -45,6 +54,7 @@ class EpisodeStepRecord:
     calibration_source: str
     router_features: Mapping[str, float]
     predicted_success: float
+    predicted_reward: float
     predicted_fidelity: float
     predicted_effect_risk: float
     action_hash: str
@@ -52,6 +62,8 @@ class EpisodeStepRecord:
     prompt_hash: str
     response_hash: str
     response_text: str
+    generation_attempts: int
+    action_recovery: str
     inference_ms: float
     controller_ms: float
     handoff_bytes: int
@@ -118,6 +130,26 @@ def _feature_mapping(
 ) -> dict[str, float]:
     depth = closure_depth(packet.semantic_nodes, packet.dependency_edges, packet.obligation_ids)
     frontier = packet.effect_frontier or build_effect_frontier(packet.effects)
+    goal = ""
+    for node in packet.semantic_nodes:
+        if node.node_type is SemanticNodeType.GOAL_CONSTRAINT:
+            if isinstance(node.value, Mapping):
+                goal = str(node.value.get("instruction", node.value))
+            else:
+                goal = str(node.value)
+            break
+    goal_tokens = re.findall(r"[a-z0-9]+", goal.lower())
+    ngrams = list(goal_tokens)
+    ngrams.extend(
+        f"{left}_{right}" for left, right in zip(goal_tokens, goal_tokens[1:])
+    )
+    hashed = [0.0] * GOAL_HASH_DIMENSIONS
+    for token in ngrams:
+        digest = sha256_text(token)
+        index = int(digest[:8], 16) % GOAL_HASH_DIMENSIONS
+        sign = 1.0 if int(digest[8:10], 16) % 2 else -1.0
+        hashed[index] += sign
+    scale = max(1.0, float(len(ngrams)) ** 0.5)
     base = {
         "step_index": float(step_index),
         "remaining_steps": float(remaining_steps),
@@ -144,7 +176,22 @@ def _feature_mapping(
         "dwell_remaining": float(
             max(0, context.minimum_dwell_steps - context.consecutive_steps)
         ),
+        "goal_char_count": float(len(goal)),
+        "goal_token_count": float(len(goal_tokens)),
+        "goal_numeric_count": float(sum(token.isdigit() for token in goal_tokens)),
+        "goal_constraint_count": float(
+            len(
+                re.findall(
+                    r"\b(?:and|under|below|less|maximum|max|size|color|pack|inch|ounce)\b",
+                    goal.lower(),
+                )
+            )
+        ),
+        "visible_action_count": float(len(packet.world.resources.get("valid_actions", ()))),
     }
+    base.update(
+        {f"goal_hash_{index:02d}": value / scale for index, value in enumerate(hashed)}
+    )
     return {name: float(base[name]) for name in FEATURE_NAMES}
 
 
@@ -312,17 +359,21 @@ class EpisodeRunner:
         estimate_provider: EstimateProvider,
         max_steps: int,
         minimum_dwell_steps: int = 2,
+        max_action_retries: int = 1,
         paper_evidence: bool = False,
         lazy_node_selector: Callable[[RelayStatePacket], tuple[str, ...]] | None = None,
     ) -> None:
         if max_steps <= 0:
             raise ValueError("max_steps must be positive")
+        if max_action_retries < 0:
+            raise ValueError("max_action_retries cannot be negative")
         self.adapter = adapter
         self.executors = dict(executors)
         self.controller = controller
         self.estimate_provider = estimate_provider
         self.max_steps = max_steps
         self.minimum_dwell_steps = minimum_dwell_steps
+        self.max_action_retries = max_action_retries
         self.paper_evidence = paper_evidence
         self.lazy_node_selector = lazy_node_selector or (lambda packet: ())
 
@@ -331,11 +382,65 @@ class EpisodeRunner:
         executor: Executor,
         observation: BenchmarkObservation,
         packet: RelayStatePacket,
-    ) -> tuple[str, NativeGenerationResult]:
+    ) -> tuple[str, NativeGenerationResult, int, str]:
         continuation = render_semantic_continuation(packet, style="concise_text")
-        messages = self.adapter.format_model_messages(observation, continuation)
-        generation = self.executors[executor].generate(messages)
-        return self.adapter.parse_model_output(generation.text), generation
+        messages = list(self.adapter.format_model_messages(observation, continuation))
+        generations: list[NativeGenerationResult] = []
+        rejected: list[str] = []
+        for attempt in range(self.max_action_retries + 1):
+            generation = self.executors[executor].generate(messages)
+            generations.append(generation)
+            action = self.adapter.parse_model_output(generation.text)
+            validation = self.adapter.validate_model_action(action, observation)
+            if validation.accepted:
+                combined = replace(
+                    generation,
+                    prompt_hash=sha256_text("|".join(item.prompt_hash for item in generations)),
+                    prompt_tokens=sum(item.prompt_tokens for item in generations),
+                    output_tokens=sum(item.output_tokens for item in generations),
+                    latency_ms=sum(item.latency_ms for item in generations),
+                    peak_cuda_memory_bytes=max(
+                        item.peak_cuda_memory_bytes for item in generations
+                    ),
+                )
+                return (
+                    validation.action,
+                    combined,
+                    len(generations),
+                    "none" if attempt == 0 else "model_retry",
+                )
+            rejected.append(validation.action)
+            if attempt < self.max_action_retries:
+                messages.extend(
+                    (
+                        {"role": "assistant", "content": generation.text},
+                        {
+                            "role": "user",
+                            "content": validation.feedback + "\nCorrected next action:",
+                        },
+                    )
+                )
+
+        fallback = self.adapter.fallback_model_action(observation, tuple(rejected))
+        if fallback:
+            validation = self.adapter.validate_model_action(fallback, observation)
+            if validation.accepted:
+                generation = generations[-1]
+                combined = replace(
+                    generation,
+                    prompt_hash=sha256_text("|".join(item.prompt_hash for item in generations)),
+                    prompt_tokens=sum(item.prompt_tokens for item in generations),
+                    output_tokens=sum(item.output_tokens for item in generations),
+                    latency_ms=sum(item.latency_ms for item in generations),
+                    peak_cuda_memory_bytes=max(
+                        item.peak_cuda_memory_bytes for item in generations
+                    ),
+                )
+                return validation.action, combined, len(generations), "deterministic_fallback"
+        raise ValueError(
+            f"model failed to produce a valid {self.adapter.descriptor.dataset_id} action "
+            f"after {len(generations)} attempt(s)"
+        )
 
     def run(self) -> EpisodeResult:
         started = time.perf_counter()
@@ -382,7 +487,9 @@ class EpisodeRunner:
                 remaining_steps=self.max_steps - step_index,
             )
             edge_action = cloud_action = ""
-            proposals: dict[Executor, tuple[str, NativeGenerationResult]] = {}
+            proposals: dict[
+                Executor, tuple[str, NativeGenerationResult, int, str]
+            ] = {}
             if self.controller.requires_both_model_proposals:
                 for executor in (Executor.EDGE, Executor.CLOUD):
                     proposals[executor] = self._generate(executor, observation, packet)
@@ -425,8 +532,9 @@ class EpisodeRunner:
                 )
                 working_packet = transaction.reconstructed_packet
 
-            action, generation = proposals.get(selected_executor) or self._generate(
-                selected_executor, observation, working_packet
+            action, generation, generation_attempts, action_recovery = (
+                proposals.get(selected_executor)
+                or self._generate(selected_executor, observation, working_packet)
             )
             effect_metadata = self.adapter.effect_metadata(action)
             actual_effect_class = EffectClass(
@@ -512,6 +620,7 @@ class EpisodeRunner:
                     calibration_source=decision.selected.calibration_source,
                     router_features=dict(decision.selected.features or {}),
                     predicted_success=decision.selected.predicted_success,
+                    predicted_reward=decision.selected.quality_score,
                     predicted_fidelity=decision.selected.predicted_fidelity,
                     predicted_effect_risk=decision.selected.handoff.effect_risk,
                     action_hash=sha256_text(action),
@@ -519,6 +628,8 @@ class EpisodeRunner:
                     prompt_hash=generation.prompt_hash,
                     response_hash=generation.response_hash,
                     response_text=generation.text,
+                    generation_attempts=generation_attempts,
+                    action_recovery=action_recovery,
                     inference_ms=generation.latency_ms,
                     controller_ms=controller_ms,
                     handoff_bytes=transaction.transmitted_bytes if transaction else 0,

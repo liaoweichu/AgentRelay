@@ -200,10 +200,26 @@ class BaselineController:
                 f"deterministic random baseline with cloud_probability={probability}",
             )
         if self.name is BaselineName.ROUTELLM_TASK:
-            executor = self._task_executor.setdefault(
-                value.sample_id,
-                Executor.EDGE if value.task_confidence >= self.threshold else Executor.CLOUD,
-            )
+            if value.sample_id not in self._task_executor:
+                by_executor = {
+                    executor: max(
+                        (
+                            estimate.quality_score
+                            for estimate in value.estimates
+                            if estimate.action.executor is executor
+                        ),
+                        default=float("-inf"),
+                    )
+                    for executor in (Executor.EDGE, Executor.CLOUD)
+                }
+                self._task_executor[value.sample_id] = max(
+                    (Executor.EDGE, Executor.CLOUD),
+                    key=lambda executor: (
+                        by_executor[executor],
+                        executor is Executor.EDGE,
+                    ),
+                )
+            executor = self._task_executor[value.sample_id]
             return self._decision(
                 _preferred_candidate(
                     value.estimates,
@@ -260,7 +276,7 @@ class BaselineController:
                 selected = max(
                     restricted,
                     key=lambda item: (
-                        item.predicted_success - 0.001 * item.inference_ms,
+                        item.quality_score - 0.001 * item.inference_ms,
                         item.predicted_fidelity,
                     ),
                 )
@@ -269,7 +285,7 @@ class BaselineController:
                 selected = max(
                     restricted,
                     key=lambda item: (
-                        item.predicted_success,
+                        item.quality_score,
                         item.predicted_fidelity,
                         -item.inference_ms,
                     ),

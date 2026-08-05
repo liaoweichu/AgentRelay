@@ -4,8 +4,8 @@
 from __future__ import annotations
 
 import argparse
-from pathlib import Path
 import random
+from pathlib import Path
 import sys
 
 
@@ -14,15 +14,10 @@ sys.path.insert(0, str(PROJECT_ROOT / "src"))
 
 from agentrelay.formal_matrix import FormalTask, write_task_manifest  # noqa: E402
 from agentrelay.inference import require_immutable_revision  # noqa: E402
-
-
-# Official WebShop instruction-split cardinalities (Yao et al., NeurIPS 2022).
-# The reported protocol uses 10,587 / 1,000 / 500 train / dev / test goals.
-WEBSHOP_OFFICIAL_SPLIT_SIZES = {
-    "train": 10587,
-    "dev": 1000,
-    "test": 500,
-}
+from agentrelay.webshop_protocol import (  # noqa: E402
+    canonical_webshop_split,
+    official_webshop_indices,
+)
 
 
 def main() -> int:
@@ -83,32 +78,34 @@ def main() -> int:
             count = len(env.server.goals)
         finally:
             env.close()
+        split = canonical_webshop_split(args.split)
+        expected_purpose = {"train": "train", "dev": "tune", "test": "evaluate"}[split]
+        if args.purpose != expected_purpose:
+            raise ValueError(
+                f"official WebShop {split} manifests require purpose={expected_purpose!r}, "
+                f"got {args.purpose!r}"
+            )
+        official_indices = official_webshop_indices(count, split)
         if args.sample_count is not None:
-            if not 0 < args.sample_count <= count:
+            if not 0 < args.sample_count <= len(official_indices):
                 raise ValueError(
-                    f"sample_count must be in (0, {count}], got {args.sample_count}"
+                    f"sample_count must be in (0, {len(official_indices)}], "
+                    f"got {args.sample_count}"
                 )
             indices = sorted(
-                random.Random(args.sample_seed).sample(range(count), args.sample_count)
+                random.Random(args.sample_seed).sample(official_indices, args.sample_count)
             )
             # A deterministic subset is a diagnostic sample, never the complete
             # official split, so it must not be attested as complete.
             complete = False
         else:
-            indices = range(count)
-            expected = WEBSHOP_OFFICIAL_SPLIT_SIZES.get(args.split)
-            if expected is not None and count != expected:
-                raise ValueError(
-                    f"WebShop split {args.split!r} must contain exactly {expected} "
-                    f"official goals, but the loaded environment exposed {count}; "
-                    f"check --webshop-file-path and --webshop-human-goals"
-                )
+            indices = official_indices
             complete = True
         for index in indices:
             tasks.append(
                 FormalTask(
                     benchmark="webshop",
-                    split=args.split,
+                    split=split,
                     task_id=str(index),
                     purpose=args.purpose,
                     task_index=index,
@@ -142,4 +139,3 @@ def main() -> int:
 
 if __name__ == "__main__":
     raise SystemExit(main())
-

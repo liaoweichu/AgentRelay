@@ -95,6 +95,11 @@ python scripts/profile_models.py \
   --trace-source '<public trace citation and immutable revision>'
 ```
 
+For the current Gemma 4 WebShop checkpoint, follow
+`docs/webshop-train-dev-gate.md` before any official-test manifest is run. The
+fixed edge and cloud collections are intentionally separate processes so only
+one model is GPU-resident at a time.
+
 Create immutable complete-split manifests with
 `scripts/build_official_task_manifest.py`. Use official train manifests first
 to collect native fixed/cascade/full-replay rollouts, then build and fit the

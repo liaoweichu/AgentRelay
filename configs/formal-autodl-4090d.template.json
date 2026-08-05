@@ -90,6 +90,8 @@
   "controller": {
     "minimum_dwell_steps": 2,
     "switch_hysteresis_ms": 5.0,
+    "reward_weight_ms": 10000.0,
+    "max_action_retries": 1,
     "calibration_alpha": 0.1,
     "minimum_calibration_group_size": 20
   },
