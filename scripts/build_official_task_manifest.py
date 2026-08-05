@@ -5,6 +5,7 @@ from __future__ import annotations
 
 import argparse
 from pathlib import Path
+import random
 import sys
 
 
@@ -25,6 +26,8 @@ def main() -> int:
     parser.add_argument("--alfworld-config")
     parser.add_argument("--train-eval")
     parser.add_argument("--webshop-file-path")
+    parser.add_argument("--sample-count", type=int, default=None)
+    parser.add_argument("--sample-seed", type=int, default=20260805)
     args = parser.parse_args()
     require_immutable_revision(args.revision, subject=args.benchmark)
     tasks: list[FormalTask] = []
@@ -64,7 +67,17 @@ def main() -> int:
             count = len(env.server.goals)
         finally:
             env.close()
-        for index in range(count):
+        if args.sample_count is not None:
+            if not 0 < args.sample_count <= count:
+                raise ValueError(
+                    f"sample_count must be in (0, {count}], got {args.sample_count}"
+                )
+            indices = sorted(
+                random.Random(args.sample_seed).sample(range(count), args.sample_count)
+            )
+        else:
+            indices = range(count)
+        for index in indices:
             tasks.append(
                 FormalTask(
                     benchmark="webshop",

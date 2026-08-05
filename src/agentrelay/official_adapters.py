@@ -281,20 +281,29 @@ class WebShopAdapter(ObservableOfficialAdapter):
         dataset_revision: str,
         split: str,
         file_path: str | None = None,
+        env: Any = None,
     ) -> None:
         require_immutable_revision(dataset_revision, subject="webshop")
-        try:
-            from web_agent_site.envs.web_agent_text_env import WebAgentTextEnv
-        except ImportError as exc:
-            raise RuntimeError("install the pinned official WebShop environment") from exc
-        kwargs: dict[str, Any] = {
-            "observation_mode": "text",
-            "human_goals": 1,
-            "session": int(session),
-        }
-        if file_path is not None:
-            kwargs["file_path"] = file_path
-        self._env = WebAgentTextEnv(**kwargs)
+        if env is not None:
+            # Reuse a caller-provided shared environment (e.g. the full official
+            # corpus constructed once per matrix run) to avoid rebuilding the
+            # product/search-engine state on every episode.
+            self._env = env
+            self._close_env = False
+        else:
+            try:
+                from web_agent_site.envs.web_agent_text_env import WebAgentTextEnv
+            except ImportError as exc:
+                raise RuntimeError("install the pinned official WebShop environment") from exc
+            kwargs: dict[str, Any] = {
+                "observation_mode": "text",
+                "human_goals": 1,
+                "session": int(session),
+            }
+            if file_path is not None:
+                kwargs["file_path"] = file_path
+            self._env = WebAgentTextEnv(**kwargs)
+            self._close_env = True
         self._session = int(session)
         self._final_reward = 0.0
         super().__init__(
@@ -359,7 +368,14 @@ class WebShopAdapter(ObservableOfficialAdapter):
         )
 
     def effect_metadata(self, action: str) -> Mapping[str, Any]:
-        irreversible = action.strip().lower() == "click[buy now]"
+        # An irreversible effect only applies when the purchase action is actually
+        # actionable in the current state.  A premature/out-of-scope "buy" proposal
+        # is rejected by the environment as a no-op, so it must not be classified
+        # as irreversible (which would otherwise mismatch the routing commit mode
+        # derived from pending_effect_class and falsely trip the safety barrier).
+        normalized = action.strip().lower()
+        available = {item.strip().lower() for item in self._valid_actions()}
+        irreversible = normalized == "click[buy now]" and normalized in available
         return {
             "effect_class": (
                 EffectClass.IRREVERSIBLE.value if irreversible else EffectClass.READ_ONLY.value
@@ -377,7 +393,8 @@ class WebShopAdapter(ObservableOfficialAdapter):
         return EffectClass.READ_ONLY
 
     def close(self) -> None:
-        self._env.close()
+        if getattr(self, "_close_env", True):
+            self._env.close()
 
 
 def _call_name(node: ast.Call) -> str:

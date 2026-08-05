@@ -290,6 +290,15 @@ class LearnedEstimateProvider:
             bandwidth_mbps=self.bandwidth_mbps,
         )
         estimates = self.estimator.candidates(features)
+        # Safety invariant: an irreversible/unknown effect must never commit
+        # through a non-barrier route, regardless of what the learned router
+        # predicts for the commit mode.  This mirrors ProfileEstimateProvider
+        # and is enforced ahead of the final execution-time barrier check.
+        if context.effect_class in {EffectClass.IRREVERSIBLE, EffectClass.UNKNOWN}:
+            estimates = tuple(
+                replace(estimate, action=replace(estimate.action, commit_mode=CommitMode.BARRIER))
+                for estimate in estimates
+            )
         return self.calibrator.calibrate_all(estimates) if self.calibrator else estimates
 
 
@@ -429,7 +438,12 @@ class EpisodeRunner:
             ):
                 raise RuntimeError(
                     "unsafe action blocked before execution: irreversible/unknown "
-                    "effect requires a barrier-selected route"
+                    "effect requires a barrier-selected route "
+                    f"[benchmark={self.adapter.descriptor.dataset_id} "
+                    f"method={self.controller.name.value} action={action!r} "
+                    f"valid_actions={getattr(observation, 'valid_actions', ())} "
+                    f"pending={effect_class.value} actual={actual_effect_class.value} "
+                    f"commit={decision.selected.action.commit_mode.value}]"
                 )
             if (
                 actual_effect_class is EffectClass.REVERSIBLE

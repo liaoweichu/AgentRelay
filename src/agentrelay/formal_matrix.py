@@ -201,6 +201,10 @@ class FormalMatrixRunner:
                 (Executor.CLOUD, config["models"]["cloud"]),
             )
         }
+        # Shared official benchmark environments (WebShop full corpus) reused
+        # across every (task, method) episode to avoid rebuilding the product
+        # corpus and search engine per episode.  Pure performance optimization.
+        self._shared_envs: dict[str, Any] = {}
 
     def _adapter(self, task: FormalTask, run_name: str) -> Any:
         revision = self.task_manifest.dataset_revision
@@ -217,11 +221,28 @@ class FormalMatrixRunner:
         if task.benchmark == "webshop":
             if task.task_index is None:
                 raise ValueError("WebShop tasks require an official session index")
+            file_path = task.webshop_file_path or None
+            key = file_path or "default"
+            if key not in self._shared_envs:
+                try:
+                    from web_agent_site.envs.web_agent_text_env import WebAgentTextEnv
+                except ImportError as exc:
+                    raise RuntimeError(
+                        "install the pinned official WebShop environment"
+                    ) from exc
+                env_kwargs: dict[str, Any] = {
+                    "observation_mode": "text",
+                    "human_goals": 1,
+                }
+                if file_path is not None:
+                    env_kwargs["file_path"] = file_path
+                self._shared_envs[key] = WebAgentTextEnv(**env_kwargs)
             return WebShopAdapter(
                 session=task.task_index,
                 dataset_revision=revision,
                 split=task.split,
-                file_path=task.webshop_file_path or None,
+                file_path=file_path,
+                env=self._shared_envs[key],
             )
         if task.benchmark == "appworld":
             return AppWorldAdapter(
@@ -291,6 +312,11 @@ class FormalMatrixRunner:
                         "method": method.value,
                     }
                 )
+        for shared_env in self._shared_envs.values():
+            try:
+                shared_env.close()
+            except Exception:  # noqa: BLE001 - best-effort teardown
+                pass
         manifest = {
             "run_id": run_id,
             "paper_evidence": True,
