@@ -23,6 +23,10 @@ def main() -> int:
     parser.add_argument("--method", action="append", required=True)
     parser.add_argument("--router")
     parser.add_argument("--calibrator")
+    parser.add_argument(
+        "--resume-key",
+        help="safe id for hash-validated episode-level resume within the run store",
+    )
     args = parser.parse_args()
     runner = FormalMatrixRunner(
         config=load_json_config(args.config),
@@ -32,11 +36,10 @@ def main() -> int:
         router_path=args.router,
         calibrator_path=args.calibrator,
     )
-    run_root = runner.run()
+    run_root = runner.run(resume_key=args.resume_key)
     print(f"run_directory={run_root}")
     return 0
 
 
 if __name__ == "__main__":
     raise SystemExit(main())
-

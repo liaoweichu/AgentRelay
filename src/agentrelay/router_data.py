@@ -8,6 +8,11 @@ from .cost import HandoffMeasurement
 from .learning import RouterTrainingRow, feature_vector
 from .policy import CandidateAction
 from .schema import CommitMode, Executor, TransferMode
+from .webshop_protocol import (
+    WEBSHOP_TOTAL_HUMAN_GOALS,
+    canonical_webshop_split,
+    official_webshop_indices,
+)
 
 
 def read_episode_records(value: Any) -> tuple[Mapping[str, Any], ...]:
@@ -52,6 +57,42 @@ def episode_key(episode: Mapping[str, Any]) -> tuple[str, str, str, str]:
         str(episode.get("split", "")),
         str(sample_id),
     )
+
+
+def validate_endpoint_episode_scope(
+    episode: Mapping[str, Any],
+    *,
+    authorized_splits: Iterable[str],
+) -> None:
+    """Reject split aliases, held-out inputs, and invalid WebShop session ids."""
+
+    allowed = {str(split) for split in authorized_splits}
+    split = str(episode.get("split", ""))
+    if split not in allowed:
+        raise ValueError(
+            f"endpoint episode split {split!r} is not authorized; expected {sorted(allowed)}"
+        )
+    if episode.get("labels_accessed_by_router") is not False:
+        raise ValueError("endpoint episode violates the router label boundary")
+    benchmark = str(episode.get("benchmark", "")).strip().lower()
+    if "webshop" not in benchmark:
+        return
+    canonical = canonical_webshop_split(split)
+    if canonical != split:
+        raise ValueError(
+            f"WebShop endpoint episodes must use canonical split {canonical!r}"
+        )
+    sample_id = episode.get("sample_id", episode.get("task_id"))
+    try:
+        session_id = int(str(sample_id))
+    except (TypeError, ValueError) as exc:
+        raise ValueError("WebShop endpoint sample_id must be an official session id") from exc
+    if session_id not in set(
+        official_webshop_indices(WEBSHOP_TOTAL_HUMAN_GOALS, split)
+    ):
+        raise ValueError(
+            f"WebShop session {session_id} is outside the official {split} split"
+        )
 
 
 def pair_endpoint_episodes(
@@ -105,10 +146,10 @@ def task_router_training_rows(
             (Executor.EDGE, edge_episode),
             (Executor.CLOUD, cloud_episode),
         ):
-            if str(episode.get("split", "")) not in allowed:
-                raise ValueError("task router training saw a non-authorized split")
-            if episode.get("labels_accessed_by_router") is not False:
-                raise ValueError("task router training violates the label boundary")
+            validate_endpoint_episode_scope(
+                episode,
+                authorized_splits=allowed,
+            )
             steps = tuple(episode.get("steps", ()))
             if not steps:
                 raise ValueError("task router training episode has no recorded steps")

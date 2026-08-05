@@ -5,7 +5,7 @@ from __future__ import annotations
 from statistics import mean
 from typing import Any, Iterable, Mapping, Protocol
 
-from .router_data import pair_endpoint_episodes
+from .router_data import pair_endpoint_episodes, validate_endpoint_episode_scope
 from .schema import Executor
 from .statistics import mcnemar_exact, paired_bootstrap_difference
 
@@ -86,13 +86,19 @@ def evaluate_router_learnability(
     minimum_oracle_capture: float = 0.30,
     minimum_cloud_fraction: float = 0.10,
     maximum_cloud_fraction: float = 0.90,
+    authorized_dev_splits: Iterable[str] = ("dev",),
 ) -> dict[str, Any]:
     pairs = pair_endpoint_episodes(episodes)
+    allowed_dev = {str(split) for split in authorized_dev_splits}
+    if not allowed_dev or "test" in allowed_dev:
+        raise ValueError("learnability gate cannot authorize the held-out test split")
     router_rewards: list[float] = []
     selected_roles: list[Executor] = []
     edge_rewards: list[float] = []
     cloud_rewards: list[float] = []
     for edge, cloud in pairs:
+        validate_endpoint_episode_scope(edge, authorized_splits=allowed_dev)
+        validate_endpoint_episode_scope(cloud, authorized_splits=allowed_dev)
         edge_steps = tuple(edge.get("steps", ()))
         cloud_steps = tuple(cloud.get("steps", ()))
         if not edge_steps or not cloud_steps:
@@ -153,6 +159,7 @@ def evaluate_router_learnability(
             "minimum_cloud_fraction": minimum_cloud_fraction,
             "maximum_cloud_fraction": maximum_cloud_fraction,
         },
+        "authorized_dev_splits": sorted(allowed_dev),
         "paired_dev_tasks": len(pairs),
         "edge_avg_reward": edge_mean,
         "cloud_avg_reward": cloud_mean,

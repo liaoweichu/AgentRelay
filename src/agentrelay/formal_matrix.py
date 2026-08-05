@@ -30,6 +30,17 @@ from .webshop_protocol import canonical_webshop_split, validate_webshop_manifest
 SAFE_ID_RE = re.compile(r"[^A-Za-z0-9_.-]+")
 
 
+def task_artifact_scope(tasks: Iterable[FormalTask]) -> tuple[bool, str]:
+    """Classify output evidence without promoting train/dev diagnostics."""
+
+    purposes = {task.purpose for task in tasks}
+    if purposes == {"evaluate"}:
+        return True, "official_evaluation"
+    if purposes <= {"train", "tune"}:
+        return False, "train_dev_development"
+    raise ValueError(f"a run cannot mix evaluation and development purposes: {purposes}")
+
+
 def required_model_executors(methods: Iterable[BaselineName | str]) -> tuple[Executor, ...]:
     """Load one model for a single fixed endpoint; all routers require both."""
 
@@ -160,7 +171,7 @@ def _profile_provider(
     path: str | Path,
     *,
     expected_models: Mapping[str, Mapping[str, Any]],
-) -> ProfileEstimateProvider:
+) -> tuple[ProfileEstimateProvider, str]:
     value = json.loads(Path(path).read_text(encoding="utf-8"))
     recorded_hash = str(value.pop("profile_hash", ""))
     if not recorded_hash or recorded_hash != sha256_json(value):
@@ -199,9 +210,12 @@ def _profile_provider(
         )
         for executor in (Executor.EDGE, Executor.CLOUD)
     }
-    return ProfileEstimateProvider(
-        profiles,
-        bandwidth_mbps=bandwidth_mbps,
+    return (
+        ProfileEstimateProvider(
+            profiles,
+            bandwidth_mbps=bandwidth_mbps,
+        ),
+        recorded_hash,
     )
 
 
@@ -227,7 +241,7 @@ class FormalMatrixRunner:
         if any(task.purpose == "evaluate" for task in task_manifest.tasks):
             if not task_manifest.complete_official_split:
                 raise ValueError("evaluation manifests must attest the complete official split")
-        self.profile_provider = _profile_provider(
+        self.profile_provider, self.profile_hash = _profile_provider(
             profile_path,
             expected_models=config["models"],
         )
@@ -318,84 +332,181 @@ class FormalMatrixRunner:
             calibrator=self.calibrator if method is BaselineName.AGENTRELAY else None,
         )
 
-    def run(self) -> Path:
-        stamp = datetime.now(timezone.utc).strftime("%Y%m%dT%H%M%S%fZ")
-        run_id = f"formal-matrix-{stamp}-{self.task_manifest.manifest_hash[:8]}"
-        run_root = self.storage.runs / run_id
-        run_root.mkdir(parents=True, exist_ok=False)
+    def run(self, *, resume_key: str | None = None) -> Path:
+        if resume_key is not None:
+            safe_resume_key = SAFE_ID_RE.sub("_", resume_key)
+            if not safe_resume_key or safe_resume_key != resume_key:
+                raise ValueError("resume_key must contain only safe id characters")
+            run_id = f"formal-matrix-{resume_key}-{self.task_manifest.manifest_hash[:8]}"
+        else:
+            stamp = datetime.now(timezone.utc).strftime("%Y%m%dT%H%M%S%fZ")
+            run_id = f"formal-matrix-{stamp}-{self.task_manifest.manifest_hash[:8]}"
+        run_root = (self.storage.runs / run_id).resolve()
+        if run_root.parent != self.storage.runs.resolve():
+            raise ValueError("formal run root escaped the configured run store")
+        paper_evidence, artifact_scope = task_artifact_scope(self.task_manifest.tasks)
+        code_revision = source_tree_revision()
+        context = {
+            "schema_version": "1.0",
+            "run_id": run_id,
+            "task_manifest_hash": self.task_manifest.manifest_hash,
+            "code_revision": code_revision,
+            "config_hash": sha256_json(self.config),
+            "profile_hash": self.profile_hash,
+            "model_revisions": {
+                role: str(value["revision"])
+                for role, value in self.config["models"].items()
+            },
+            "methods": [method.value for method in self.methods],
+            "resident_executors": [executor.value for executor in self.executors],
+            "paper_evidence": paper_evidence,
+            "artifact_scope": artifact_scope,
+        }
+        context["context_hash"] = sha256_json(context)
+        context_path = run_root / "run-context.json"
+        if run_root.exists():
+            if resume_key is None:
+                raise FileExistsError(run_root)
+            if not context_path.is_file():
+                raise ValueError(f"resume run has no immutable context: {run_root}")
+            recorded_context = json.loads(context_path.read_text(encoding="utf-8"))
+            if recorded_context != context:
+                raise ValueError("resume context does not match current code/config/manifest")
+        else:
+            run_root.mkdir(parents=True, exist_ok=False)
+            temporary_context = context_path.with_suffix(".json.tmp")
+            temporary_context.write_text(
+                canonical_json(context) + "\n",
+                encoding="utf-8",
+            )
+            temporary_context.replace(context_path)
         written: list[dict[str, Any]] = []
-        for task in self.task_manifest.tasks:
-            for method in self.methods:
-                run_name = f"{run_id}-{task.benchmark}-{task.split}-{method.value}"
-                adapter = self._adapter(task, run_name)
-                try:
-                    runner = EpisodeRunner(
-                        adapter=adapter,
-                        executors=self.executors,
-                        controller=BaselineController(
-                            method,
-                            policy=ConstrainedUtilityPolicy(
-                                switch_hysteresis_ms=float(
-                                    self.config.get("controller", {}).get(
-                                        "switch_hysteresis_ms", 5.0
-                                    )
-                                ),
-                                success_weight=float(
-                                    self.config.get("controller", {}).get(
-                                        "reward_weight_ms", 10_000.0
-                                    )
-                                ),
-                                selection_mode=(
-                                    "scalarized_utility"
-                                    if method
-                                    in {
-                                        BaselineName.UNCALIBRATED_JOINT,
-                                        BaselineName.AGENTRELAY,
-                                    }
-                                    else "constrained_cost"
+        total = len(self.task_manifest.tasks) * len(self.methods)
+        try:
+            for task in self.task_manifest.tasks:
+                for method in self.methods:
+                    safe_task = SAFE_ID_RE.sub("_", task.task_id)[:120]
+                    relative = (
+                        Path(task.benchmark)
+                        / task.split
+                        / method.value
+                        / f"{safe_task}.json"
+                    )
+                    target = run_root / relative
+                    if target.is_file():
+                        payload = json.loads(target.read_text(encoding="utf-8"))
+                        recorded_hash = str(payload.pop("result_hash", ""))
+                        if not recorded_hash or sha256_json(payload) != recorded_hash:
+                            raise ValueError(f"resume episode hash mismatch: {target}")
+                        expected_identity = {
+                            "benchmark": task.benchmark,
+                            "dataset_revision": self.task_manifest.dataset_revision,
+                            "split": task.split,
+                            "sample_id": task.task_id,
+                            "method": method.value,
+                            "paper_evidence": paper_evidence,
+                        }
+                        if any(payload.get(key) != value for key, value in expected_identity.items()):
+                            raise ValueError(f"resume episode identity mismatch: {target}")
+                        written.append(
+                            {
+                                "path": relative.as_posix(),
+                                "result_hash": recorded_hash,
+                                "sample_id": task.task_id,
+                                "method": method.value,
+                            }
+                        )
+                        print(
+                            f"episode_resumed={len(written)}/{total} "
+                            f"sample_id={task.task_id} method={method.value}",
+                            flush=True,
+                        )
+                        continue
+                    run_name = f"{run_id}-{task.benchmark}-{task.split}-{method.value}"
+                    adapter = self._adapter(task, run_name)
+                    try:
+                        runner = EpisodeRunner(
+                            adapter=adapter,
+                            executors=self.executors,
+                            controller=BaselineController(
+                                method,
+                                policy=ConstrainedUtilityPolicy(
+                                    switch_hysteresis_ms=float(
+                                        self.config.get("controller", {}).get(
+                                            "switch_hysteresis_ms", 5.0
+                                        )
+                                    ),
+                                    success_weight=float(
+                                        self.config.get("controller", {}).get(
+                                            "reward_weight_ms", 10_000.0
+                                        )
+                                    ),
+                                    selection_mode=(
+                                        "scalarized_utility"
+                                        if method
+                                        in {
+                                            BaselineName.UNCALIBRATED_JOINT,
+                                            BaselineName.AGENTRELAY,
+                                        }
+                                        else "constrained_cost"
+                                    ),
                                 ),
                             ),
-                        ),
-                        estimate_provider=self._provider(method),
-                        max_steps=int(self.config["benchmarks"][task.benchmark]["max_steps"]),
-                        minimum_dwell_steps=int(
-                            self.config.get("controller", {}).get("minimum_dwell_steps", 2)
-                        ),
-                        max_action_retries=int(
-                            self.config.get("controller", {}).get("max_action_retries", 1)
-                        ),
-                        paper_evidence=True,
+                            estimate_provider=self._provider(method),
+                            max_steps=int(
+                                self.config["benchmarks"][task.benchmark]["max_steps"]
+                            ),
+                            minimum_dwell_steps=int(
+                                self.config.get("controller", {}).get(
+                                    "minimum_dwell_steps", 2
+                                )
+                            ),
+                            max_action_retries=int(
+                                self.config.get("controller", {}).get(
+                                    "max_action_retries", 1
+                                )
+                            ),
+                            paper_evidence=paper_evidence,
+                        )
+                        result = runner.run()
+                    finally:
+                        adapter.close()
+                    target.parent.mkdir(parents=True, exist_ok=True)
+                    payload = result.to_dict()
+                    payload["result_hash"] = sha256_json(payload)
+                    temporary = target.with_suffix(".json.tmp")
+                    temporary.write_text(canonical_json(payload) + "\n", encoding="utf-8")
+                    temporary.replace(target)
+                    written.append(
+                        {
+                            "path": relative.as_posix(),
+                            "result_hash": payload["result_hash"],
+                            "sample_id": result.sample_id,
+                            "method": method.value,
+                        }
                     )
-                    result = runner.run()
-                finally:
-                    adapter.close()
-                safe_task = SAFE_ID_RE.sub("_", task.task_id)[:120]
-                relative = Path(task.benchmark) / task.split / method.value / f"{safe_task}.json"
-                target = run_root / relative
-                target.parent.mkdir(parents=True, exist_ok=True)
-                payload = result.to_dict()
-                payload["result_hash"] = sha256_json(payload)
-                temporary = target.with_suffix(".json.tmp")
-                temporary.write_text(canonical_json(payload) + "\n", encoding="utf-8")
-                temporary.replace(target)
-                written.append(
-                    {
-                        "path": relative.as_posix(),
-                        "result_hash": payload["result_hash"],
-                        "sample_id": result.sample_id,
-                        "method": method.value,
-                    }
-                )
-        for shared_env in self._shared_envs.values():
-            try:
-                shared_env.close()
-            except Exception:  # noqa: BLE001 - best-effort teardown
-                pass
+                    print(
+                        f"episode_completed={len(written)}/{total} "
+                        f"sample_id={result.sample_id} method={method.value}",
+                        flush=True,
+                    )
+        finally:
+            for shared_env in self._shared_envs.values():
+                try:
+                    shared_env.close()
+                except Exception:  # noqa: BLE001 - best-effort teardown
+                    pass
         manifest = {
             "run_id": run_id,
-            "paper_evidence": True,
+            "paper_evidence": paper_evidence,
+            "artifact_scope": artifact_scope,
+            "task_purposes": sorted(
+                {task.purpose for task in self.task_manifest.tasks}
+            ),
             "task_manifest_hash": self.task_manifest.manifest_hash,
-            "code_revision": source_tree_revision(),
+            "code_revision": code_revision,
+            "config_hash": context["config_hash"],
+            "profile_hash": self.profile_hash,
             "model_revisions": {
                 role: str(value["revision"])
                 for role, value in self.config["models"].items()
@@ -405,6 +516,7 @@ class FormalMatrixRunner:
             "results": written,
             "hardware": collect_hardware_metadata(),
             "labels_accessed_by_router": False,
+            "run_context_hash": context["context_hash"],
         }
         manifest["manifest_hash"] = sha256_json(manifest)
         (run_root / "manifest.json").write_text(canonical_json(manifest) + "\n", encoding="utf-8")

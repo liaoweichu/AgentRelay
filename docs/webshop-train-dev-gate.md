@@ -8,6 +8,28 @@ Run on the AutoDL 4090D from `/root/autodl-tmp/AgentRelay` after pulling the
 current commit. Use the locked Gemma 4 configuration and measured service
 profile already present on the instance.
 
+## Recommended one-command run
+
+The orchestrator runs the four fixed endpoints sequentially, validates their
+code/config/profile/model/task-manifest provenance, writes a receipt after each
+completed process, pairs the endpoints, fits the reward router, and applies the
+gate. Re-running the same command with the same output directory resumes
+completed runs and hash-valid episodes from an interrupted run.
+
+```bash
+python scripts/run_webshop_train_dev_gate.py \
+  --config /root/autodl-tmp/AgentRelay/formal-autodl-4090d.locked.json \
+  --profile /root/autodl-tmp/AgentRelay/results/service-profile.json \
+  --webshop-file /root/autodl-tmp/AgentRelay/repositories/webshop/data/items_shuffle.json \
+  --revision 64fa2a5c15c7daa698b9ac93f5bb5437b634c9bd \
+  --output-dir /root/autodl-tmp/AgentRelay/results/webshop-train-dev-gate
+```
+
+An exit status of `0` means that the predeclared gate passed. Status `2` means
+that the gate result was written but failed; do not run the official test.
+
+## Manual recovery commands
+
 ```bash
 REVISION=64fa2a5c15c7daa698b9ac93f5bb5437b634c9bd
 WEBSHOP_FILE=/root/autodl-tmp/AgentRelay/repositories/webshop/data/items_shuffle.json

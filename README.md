@@ -24,14 +24,15 @@ columns; it is never used for tuning, model selection, or manuscript tables.
 - Public data: `LulaCola/AgentProcessBench/bfcl@test@cd81f326...a98bf`
 - Result: 1/1 nonempty native generation; semantic protocol v2, obligation
   closure, named predecessor patch, effect frontier, and trace provenance valid
-- Software: 47 tests pass; 12 routing methods and 7 continuation codecs implemented
-- Independent audit: all 16 checks passed; `paper_evidence=false`
+- Software: 53 tests pass; 12 routing methods and 7 continuation codecs implemented
+- Independent audit: all 14 checks passed; `paper_evidence=false`
 - Peak CUDA memory: 9,908,711,424 bytes; generation latency: 8,791.74 ms
 - Run: `artifacts/local-data/runs/local-smoke-20260805T091401934426Z-1a137502`
 
-The next action requires an AutoDL RTX 4090D instance. Run the paired WebShop
-train/dev gate in `docs/webshop-train-dev-gate.md`; the official test split
-remains blocked until that gate passes.
+The next action requires an AutoDL RTX 4090D instance. Run the resumable,
+one-command paired WebShop train/dev gate in `docs/webshop-train-dev-gate.md`.
+Endpoint code/config/profile/model/manifest provenance is checked before
+fitting; the official test split remains blocked until that gate passes.
 
 ## Layout
 
