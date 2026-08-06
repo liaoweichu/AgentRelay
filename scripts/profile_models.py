@@ -94,6 +94,9 @@ def main() -> int:
         report[str(role)] = {
             "model_id": model_config.model_id,
             "model_revision": model_config.revision,
+            "model_source": model_config.model_source,
+            "dtype": model_config.dtype,
+            "quantization": model_config.quantization,
             "inference_ms": median(value.latency_ms for value in values),
             "rehydration_ms": rehydration_ms,
             "prompt_tokens": values[0].prompt_tokens,

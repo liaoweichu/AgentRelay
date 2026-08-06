@@ -1,5 +1,9 @@
 # WebShop train/dev router gate
 
+> Historical/secondary stress-test path. It is not the active router-training
+> gate. The active primary gate is the pinned τ²-bench workflow in
+> `docs/cloud-4090d-handoff-plan-20260806.md`.
+
 This gate never reads the official WebShop test range. The upstream seed-233
 goal order is fixed as test `0..499`, dev `500..1499`, and train `1500..12086`.
 The diagnostic samples below are drawn only inside train and dev.

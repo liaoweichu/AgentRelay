@@ -14,6 +14,11 @@ python scripts/export_method_manifest.py \
   artifacts/local-data/results/implemented-methods-v2.json
 python -m agentrelay.cli check-config configs/local-smoke.template.json --allow-unlocked
 python scripts/audit_model_pair.py
+python scripts/preflight_tau2.py \
+  configs/formal-autodl-4090d.locked.json \
+  .tmp_tau2_src \
+  configs/tau2-user-simulator.json \
+  --software-only
 ```
 
 These tests use minimal program fixtures only. They test serialization,
@@ -24,7 +29,7 @@ and are never included in paper tables.
 
 The local machine does not contain the Gemma 4 E4B/12B checkpoints and is not
 authorized to download or run them. Local work stops after Tier 0 software and
-model-policy checks. The first native Gemma smoke is G6 on the AutoDL 4090D,
+model-policy checks. The first native Gemma smoke is G7 on the AutoDL 4090D,
 using `docs/cloud-4090d-handoff-plan-20260806.md`.
 
 ## Tier 2: AutoDL RTX 4090D formal runs
@@ -45,6 +50,8 @@ python scripts/download_public_data.py \
 python scripts/checkout_repositories.py \
   /root/autodl-tmp/AgentRelay/formal-autodl-4090d.locked.json
 bash scripts/prepare_official_benchmarks.sh
+bash scripts/prepare_tau2_bench.sh \
+  /root/autodl-tmp/AgentRelay/repositories/tau2-bench
 ```
 
 The locked configuration records exact model, dataset, and official repository
@@ -70,10 +77,11 @@ python scripts/profile_models.py \
   --trace-source '<public trace citation and immutable revision>'
 ```
 
-For the current Gemma 4 WebShop checkpoint, follow
-`docs/webshop-train-dev-gate.md` before any official-test manifest is run. The
-fixed edge and cloud collections are intentionally separate processes so only
-one model is GPU-resident at a time.
+For the active Gemma 4 checkpoint, follow
+`docs/cloud-4090d-handoff-plan-20260806.md`: build the deterministic τ²
+train/dev manifest from official train, run the three-domain text smoke, run
+the E4B precision sensitivity, then run the reward-aware router gate. Fixed
+edge/cloud collections are separate processes so only one model is resident.
 
 Create immutable complete-split manifests with
 `scripts/build_official_task_manifest.py`. Use official train manifests first
@@ -106,13 +114,12 @@ not be described as exact official reproductions.
 
 Run the experiment gates in this order:
 
-1. E0 software accounting and local diagnostic probe.
-2. E2 state fidelity on the ALFWorld development split.
-3. E4 effect-failure injection on the AppWorld development split.
-4. Freeze schema, prompts, thresholds, and router configuration.
-5. E1/E3 full official evaluation and routing-reversal analysis.
-6. E5 real recorded network trace replay.
-7. E6 cross-benchmark generalization with the same Gemma 4 pair if budget remains.
+1. Software checks plus pinned τ²/ModelScope software preflight.
+2. Three-domain τ² text smoke with the fixed user simulator.
+3. E4B NF4/BF16-compute versus FP16 sensitivity diagnostic.
+4. τ² official-train-derived train/dev reward-router learnability gate.
+5. Freeze schema, prompts, thresholds, and router configuration.
+6. Only after audit: formal evaluation, ablations, and cross-benchmark stress tests.
 
 Do not inspect test evaluator internals or alter prompts, selection thresholds,
 or task order after a formal test run. Any interrupted run is retained with its

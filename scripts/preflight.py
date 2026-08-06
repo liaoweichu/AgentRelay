@@ -63,6 +63,17 @@ def main() -> int:
                 import bitsandbytes  # noqa: F401
             except ImportError as exc:
                 raise RuntimeError("formal quantized models require bitsandbytes") from exc
+    modelscope_version = None
+    if any(str(model.get("model_source", "huggingface")) == "modelscope" for model in config["models"].values()):
+        try:
+            import modelscope
+        except ImportError as exc:
+            raise RuntimeError("ModelScope-backed models require modelscope==1.39.1") from exc
+        modelscope_version = str(modelscope.__version__)
+        if modelscope_version != "1.39.1":
+            raise RuntimeError(
+                f"formal ModelScope dependency must be 1.39.1, found {modelscope_version}"
+            )
     total, used, free = shutil.disk_usage(storage.root)
     report = {
         "config": str(Path(args.config).resolve()),
@@ -73,6 +84,7 @@ def main() -> int:
         "torch": torch.__version__,
         "transformers": transformers.__version__,
         "datasets": datasets.__version__,
+        "modelscope": modelscope_version,
         "gpu": gpu_name,
         "cuda": torch.version.cuda,
         "gpu_total_memory_bytes": int(torch.cuda.get_device_properties(0).total_memory),

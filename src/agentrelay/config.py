@@ -97,6 +97,9 @@ def validate_gemma4_model_pair(models: Mapping[str, Any]) -> None:
     # Model capacity is the treatment.  Decoding must remain paired so a token
     # budget, sampling, or thinking-mode difference cannot masquerade as routing gain.
     paired_fields = (
+        "model_source",
+        "dtype",
+        "quantization",
         "max_new_tokens",
         "do_sample",
         "temperature",
@@ -113,6 +116,17 @@ def validate_gemma4_model_pair(models: Mapping[str, Any]) -> None:
             )
         if edge.get(field) != cloud.get(field):
             raise ValueError(f"Gemma 4 edge/cloud decoding field {field!r} must match")
+    formal_loading = {
+        "model_source": "modelscope",
+        "dtype": "bfloat16",
+        "quantization": "bnb_4bit",
+    }
+    for role, model in (("edge", edge), ("cloud", cloud)):
+        for field, expected in formal_loading.items():
+            if model.get(field) != expected:
+                raise ValueError(
+                    f"Gemma 4 {role}.{field} must be the formal value {expected!r}"
+                )
 
 
 def validate_experiment_config(

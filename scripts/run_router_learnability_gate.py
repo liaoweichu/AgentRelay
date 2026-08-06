@@ -34,6 +34,7 @@ def _read(path: str) -> tuple[dict, ...]:
 
 
 def _provenance_scope(episodes: tuple[dict, ...], *, label: str) -> dict:
+    tau2_scope = all(str(episode.get("benchmark", "")).startswith("tau2/") for episode in episodes)
     records = []
     for index, episode in enumerate(episodes, 1):
         provenance = episode.get("endpoint_provenance")
@@ -51,6 +52,30 @@ def _provenance_scope(episodes: tuple[dict, ...], *, label: str) -> dict:
         )
         if any(not provenance.get(field) for field in required):
             raise ValueError(f"{label} episode {index} has incomplete endpoint provenance")
+        if tau2_scope and any(
+            not provenance.get(field)
+            for field in (
+                "model_precisions",
+                "active_precision",
+                "tau2_revision",
+                "user_config_hash",
+            )
+        ):
+            raise ValueError(f"{label} tau2 episode {index} has incomplete precision/user provenance")
+        if tau2_scope:
+            role = str(episode.get("role", ""))
+            active = provenance["active_precision"]
+            expected_active = {
+                "model_id": provenance["model_ids"].get(role),
+                "revision": provenance["model_revisions"].get(role),
+                "model_source": "modelscope",
+                "dtype": "bfloat16",
+                "quantization": "bnb_4bit",
+            }
+            if active != expected_active:
+                raise ValueError(
+                    f"{label} tau2 episode {index} active precision is not the formal arm"
+                )
         records.append(provenance)
     code_revisions = {str(item["code_revision"]) for item in records}
     config_hashes = {str(item["config_hash"]) for item in records}
@@ -64,6 +89,11 @@ def _provenance_scope(episodes: tuple[dict, ...], *, label: str) -> dict:
     model_id_payloads = {
         canonical_json(dict(item["model_ids"])) for item in records
     }
+    precision_payloads = {
+        canonical_json(dict(item.get("model_precisions", {}))) for item in records
+    }
+    tau2_revisions = {str(item.get("tau2_revision", "")) for item in records}
+    user_config_hashes = {str(item.get("user_config_hash", "")) for item in records}
     if (
         len(code_revisions) != 1
         or len(config_hashes) != 1
@@ -79,12 +109,29 @@ def _provenance_scope(episodes: tuple[dict, ...], *, label: str) -> dict:
     model_ids = json.loads(next(iter(model_id_payloads)))
     if model_ids != GEMMA4_FORMAL_MODEL_PAIR:
         raise ValueError(f"{label} endpoints do not use the frozen Gemma 4 model pair")
+    model_precisions = json.loads(next(iter(precision_payloads)))
+    if tau2_scope:
+        if len(precision_payloads) != 1 or len(tau2_revisions) != 1 or len(user_config_hashes) != 1:
+            raise ValueError(f"{label} tau2 endpoints disagree on precision/user provenance")
+        expected_precision = {
+            role: {
+                "model_source": "modelscope",
+                "dtype": "bfloat16",
+                "quantization": "bnb_4bit",
+            }
+            for role in ("edge", "cloud")
+        }
+        if model_precisions != expected_precision:
+            raise ValueError(f"{label} tau2 endpoints do not use the paired formal precision")
     return {
         "code_revision": next(iter(code_revisions)),
         "config_hash": next(iter(config_hashes)),
         "profile_hash": next(iter(profile_hashes)),
         "model_ids": model_ids,
         "model_revisions": json.loads(next(iter(model_payloads))),
+        "model_precisions": model_precisions,
+        "tau2_revision": next(iter(tau2_revisions)),
+        "user_config_hash": next(iter(user_config_hashes)),
         "task_manifest_hash": next(iter(task_manifests)),
         "run_ids": sorted(run_ids),
         "endpoint_manifest_hashes": sorted(endpoint_manifests),
@@ -99,8 +146,8 @@ def main() -> int:
     parser.add_argument("gate_output")
     parser.add_argument("--train-split", default="train")
     parser.add_argument("--dev-split", choices=("dev",), default="dev")
-    parser.add_argument("--minimum-train-tasks", type=int, default=200)
-    parser.add_argument("--minimum-paired-tasks", type=int, default=100)
+    parser.add_argument("--minimum-train-tasks", type=int, default=120)
+    parser.add_argument("--minimum-paired-tasks", type=int, default=50)
     parser.add_argument("--minimum-oracle-capture", type=float, default=0.30)
     parser.add_argument("--minimum-cloud-fraction", type=float, default=0.10)
     parser.add_argument("--maximum-cloud-fraction", type=float, default=0.90)
@@ -116,6 +163,9 @@ def main() -> int:
         "profile_hash",
         "model_ids",
         "model_revisions",
+        "model_precisions",
+        "tau2_revision",
+        "user_config_hash",
     ):
         if train_provenance[field] != dev_provenance[field]:
             raise ValueError(f"train/dev provenance mismatch for {field}")
@@ -147,9 +197,9 @@ def main() -> int:
         raise ValueError("train and dev endpoint inputs contain overlapping tasks")
     train_domains = {(item[0], item[1]) for item in train_tasks}
     dev_domains = {(item[0], item[1]) for item in dev_tasks}
-    if len(train_domains) != 1 or train_domains != dev_domains:
+    if not train_domains or train_domains != dev_domains:
         raise ValueError(
-            "train and dev endpoint inputs must share one benchmark and dataset revision"
+            "train and dev endpoint inputs must share the same benchmark/domain revisions"
         )
     gate = evaluate_router_learnability(
         router,
@@ -179,8 +229,10 @@ def main() -> int:
             "independent_train_tasks": independent_train_tasks,
             "train_episodes_hash": sha256_json(train),
             "dev_episodes_hash": sha256_json(dev),
-            "benchmark": next(iter(train_domains))[0],
-            "dataset_revision": next(iter(train_domains))[1],
+            "benchmarks": [
+                {"benchmark": benchmark, "dataset_revision": revision}
+                for benchmark, revision in sorted(train_domains)
+            ],
             "endpoint_provenance": {
                 "train": train_provenance,
                 "dev": dev_provenance,

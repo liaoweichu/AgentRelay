@@ -1,42 +1,37 @@
-# AutoDL 4090D Gemma 4 Execution Handoff
+# AutoDL 4090D 交接：Gemma 4 × τ²-bench
 
-Date: 2026-08-06  
-Execution host: AutoDL RTX 4090D, 24 GB  
-Model pair: edge `google/gemma-4-E4B-it`; cloud `google/gemma-4-12b-it`  
-Current objective: complete the cloud-only model gate and WebShop official
-train/dev learnability gate. Do not run the official test split.
+日期：2026-08-06
+主实验模型：edge `google/gemma-4-E4B-it`，cloud `google/gemma-4-12b-it`
+模型来源：ModelScope
+主工作负载：τ²-bench airline / retail / telecom text mode
+本阶段目标：先完成三域 smoke、E4B 精度敏感性和 train/dev reward-aware router 可学习性门控；不运行 τ² 官方 test，不写论文。
 
-## Responsibility Boundary
+## 冻结约束
 
-- The local RTX 4080 performs software tests only. It does not download, lock,
-  load, profile, or run either Gemma model.
-- The 4090D performs model locking, native inference, service profiling, and
-  train/dev rollouts.
-- Do not reuse the old Qwen service profile or legacy matrix. Do not treat a
-  ModelScope `snapshots/master` directory as an immutable model revision.
-- Start after the model-policy changes are committed and pushed to `main`.
-  Pull the latest `main`; no Git SHA or upload-file hash needs to be recorded or
-  compared manually.
+- τ²-bench 固定到 `0ed2fd8d830a20657d89ae9c2efcc94838aa7129`。不得使用已演化为 τ³ 的当前 `main`。
+- router 的内部 train/dev 均只从 τ² 官方 `train` 划分；官方 `test` 保持封存。
+- 正式成对端点统一使用 NF4 4-bit 权重、BF16 compute。E4B FP16 只出现在独立 sensitivity 目录，不能混入 router 训练。
+- user simulator 固定为 τ² 官方实现，模型与解码见 `configs/tau2-user-simulator.json`。密钥只从 `OPENAI_API_KEY` 读取，不写入任何配置或结果。
+- edge 与 cloud 串行、单模型驻留。任何 runner 重启都使用同一命令和同一输出目录，由内置 provenance 校验决定是否可恢复。
+- 无需人工记录 Git 哈希或上传文件哈希；代码内部仍自动保存不可变 revision 和 artifact self-hash。
 
-## Execution Plan Table
+## 执行表
 
-| Gate | Cloud action | Required output | Pass condition | Stop / return condition |
-| --- | --- | --- | --- | --- |
-| G0 | Pull the latest pushed `main` | clean `git status --short` and successful fast-forward pull | working tree is clean and `git pull --ff-only` succeeds | any cloud-local edit or merge conflict: stop; do not reset or overwrite it |
-| G1 | Bootstrap the isolated runtime under `/root/autodl-tmp/AgentRelay` | activated venv and `env.sh` | installation completes; all cache/temp variables point below the project root | dependency or disk failure: return the complete error log |
-| G2 | Run software and model-policy checks | unit-test log, compile status, model-pair audit JSON | 57 tests pass; compilation succeeds; audit says `valid=true` and exact E4B/12B IDs | any failure: stop before model loading |
-| G3 | Resolve every mutable model/data/repository reference | `formal-autodl-4090d.locked.json` | `lock_config.py` and `check-config` succeed for the exact Gemma pair | HF/Git resolution or access failure: stop; never derive a fake revision from a local path |
-| G4 | Run hardware/storage preflight | `results/preflight-gemma4.json` | GPU name contains `4090`; memory is at least 20 GiB; CUDA and bitsandbytes load; paths are confined to persistent storage | any failed assertion: stop |
-| G5 | Download pinned data and check out official environments | dataset row lines and three repository checkout lines | every command succeeds under the locked config; WebShop preparation succeeds | missing or mismatched locked asset: stop |
-| G6 | Sequentially smoke-test E4B and 12B through the tracked inference path | `results/service-profile-gemma4-smoke.json` | file contains exact IDs/revisions for both roles; both produce native nonempty output; only one model is resident at a time | OOM/load/parser failure: stop and return the file/log; do not change model, precision, thinking mode, or token budget |
-| G7 | Generate a fresh Gemma service profile using the retained real network trace | `results/service-profile-gemma4.json` | exact IDs/revisions match the lock; non-null positive bandwidth; profile self-hash exists | old Qwen IDs, null bandwidth, or trace failure: stop |
-| G8 | Run 200 paired official-train and 100 paired official-dev WebShop tasks | gate receipt, four endpoint runs, paired JSONL, router, gate JSON | command finishes with status 0 or declared gate-failure status 2; all provenance checks pass | status 2 means empirical gate failure: return artifacts and do not run test; any other error may be resumed only with the identical command |
-| G9 | Return the audit packet | files listed below plus run-directory paths | files and paths are complete enough for local independent review | do not start E1-E7 or manuscript work before review |
+| 顺序 | 动作 | 通过条件 | 失败时处理 |
+| --- | --- | --- | --- |
+| G0 | 拉取最新 `main` | 工作树干净，fast-forward 成功 | 有云端本地改动或冲突就停止；不要 reset |
+| G1 | 安装项目固定依赖 | `modelscope==1.39.1`，测试与编译通过 | 返回完整安装/测试日志 |
+| G2 | 生成不可变配置 | 两个 ModelScope 模型均解析为完整 revision；τ² 为指定 commit | 不允许回退到 HF 或 `master` 快照 |
+| G3 | checkout 并安装 τ² | origin、HEAD、三域 split 全部通过 | commit/split 不符立即停止 |
+| G4 | GPU/ModelScope/τ² 预检 | 4090D、显存、缓存路径、包版本、模型对、user secret 全部通过 | 模型尚未加载前停止 |
+| G5 | 生成 τ² 内部 train/dev manifest | airline 21/9、retail 52/22、telecom 52/22 | 任何 test 访问或计数变化均停止 |
+| G6 | 生成新服务 profile | 精确记录 ID/revision/source/dtype/quantization，真实网络 trace 非空 | 不复用旧 Qwen profile，不填常数带宽 |
+| G7 | 两模型三域 text smoke | 三个 domain 均有一对 episode；step-zero features 成对一致 | parser、API、OOM 或输入不一致即停止 |
+| G8 | E4B 4-bit/FP16 sensitivity | 两臂任务完全一致，分别记录 reward/latency/peak memory | 仅返回诊断；不得据此改写正式配置 |
+| G9 | τ² train/dev reward router gate | 125 train tasks、53 dev tasks 均有 edge/cloud 配对；输出 router 和 gate | exit 2 是经验门控失败；其他非零是运行/完整性失败 |
+| G10 | 回传审计包 | 下列文件和完整日志齐全 | 在本地审计前不跑 test/baseline/full matrix |
 
-## Step 0: Latest-Main Gate
-
-No commit SHA or uploaded-file hash needs to be supplied. The cloud operator
-only pulls the latest pushed `main` with a clean working tree.
+## 0. 更新代码
 
 ```bash
 cd /root/autodl-tmp/AgentRelay
@@ -48,179 +43,193 @@ git diff --exit-code
 git diff --cached --exit-code
 ```
 
-If the first `git status --short` is nonempty, stop and report it. Do not use
-`git reset --hard`, do not delete cloud files, and do not continue on a
-conflicted or locally modified tree.
+首个 `git status --short` 非空时停止并报告。不要覆盖云端本地文件。
 
-## Step 1: Bootstrap and Software Gate
+## 1. 安装与软件门控
 
 ```bash
 cd /root/autodl-tmp/AgentRelay
 bash scripts/bootstrap_autodl.sh "$PWD"
 source /root/autodl-tmp/AgentRelay/env.sh
 
-python -m unittest discover -s tests -v
+python -m pip show modelscope
+python -c 'import modelscope; assert modelscope.__version__=="1.39.1"; print(modelscope.__version__)'
+python -m pytest -q
 python -m compileall -q src scripts tests
 python scripts/audit_model_pair.py
 ```
 
-Expected audit identities:
-
-```text
-edge  = google/gemma-4-E4B-it
-cloud = google/gemma-4-12b-it
-```
-
-## Step 2: Create and Inspect the Immutable Lock
+## 2. 生成锁定配置
 
 ```bash
-cd /root/autodl-tmp/AgentRelay
-LOCK=/root/autodl-tmp/AgentRelay/formal-autodl-4090d.locked.json
+ROOT=/root/autodl-tmp/AgentRelay
+LOCK=$ROOT/formal-autodl-4090d.locked.json
 
 python scripts/lock_config.py \
   configs/formal-autodl-4090d.template.json \
   "$LOCK"
-
 python -m agentrelay.cli check-config "$LOCK"
-python -c 'import json; p=json.load(open("/root/autodl-tmp/AgentRelay/formal-autodl-4090d.locked.json")); expected={"edge":"google/gemma-4-E4B-it","cloud":"google/gemma-4-12b-it"}; assert {k:v["model_id"] for k,v in p["models"].items()}==expected; print({k:v["model_id"] for k,v in p["models"].items()})'
 ```
 
-If Hugging Face access or license authorization prevents revision resolution,
-stop and return the error. The existing ModelScope `master` snapshots may be
-kept as caches, but they cannot replace the immutable lock.
+锁定过程直接访问 ModelScope API。两个模型的 `model_source` 必须仍为 `modelscope`；不得改为 Hugging Face ID，也不得把本地目录名伪装成 revision。
 
-## Step 3: Hardware and Storage Preflight
-
-```bash
-python scripts/preflight.py \
-  "$LOCK" \
-  --output /root/autodl-tmp/AgentRelay/results/preflight-gemma4.json
-```
-
-Return `preflight-gemma4.json` immediately if this step fails. Do not begin a
-model download or rollout with a failed preflight.
-
-## Step 4: Pinned Data and Official Environments
+## 3. checkout、安装 τ²、准备公共数据
 
 ```bash
 python scripts/download_public_data.py "$LOCK"
 python scripts/checkout_repositories.py "$LOCK"
-bash scripts/prepare_official_benchmarks.sh
+
+TAU2_REPO=$ROOT/repositories/tau2-bench
+bash scripts/prepare_tau2_bench.sh "$TAU2_REPO"
+
+git -C "$TAU2_REPO" rev-parse HEAD
+git -C "$TAU2_REPO" remote get-url origin
 ```
 
-Keep the complete stdout containing dataset row counts and repository commits.
+预期 HEAD：
 
-## Step 5: Sequential Two-Model Smoke
+```text
+0ed2fd8d830a20657d89ae9c2efcc94838aa7129
+```
 
-This command loads E4B, releases it, then loads 12B. It is diagnostic only and
-does not need a network trace.
+## 4. 云端预检
+
+先在 shell 中提供 user simulator 密钥；不要写入文件：
 
 ```bash
-python scripts/profile_models.py \
+export OPENAI_API_KEY='在云端 shell 中设置，不要回传'
+
+python scripts/preflight.py \
   "$LOCK" \
-  /root/autodl-tmp/AgentRelay/results/service-profile-gemma4-smoke.json \
-  --repeats 1
+  --output "$ROOT/results/preflight-gemma4.json"
+
+python scripts/preflight_tau2.py \
+  "$LOCK" \
+  "$TAU2_REPO" \
+  "$ROOT/configs/tau2-user-simulator.json" \
+  --output "$ROOT/results/preflight-tau2.json"
 ```
 
-Validate identity against the lock:
+`preflight-tau2.json` 应报告官方 split：airline 30/20、retail 74/40、telecom 74/40（train/test）。这里只读取 split ledger，router 不读取 test task 内容或 label。
+
+## 5. 固定内部 train/dev 清单
 
 ```bash
-python -c 'import json; root="/root/autodl-tmp/AgentRelay/"; c=json.load(open(root+"formal-autodl-4090d.locked.json")); p=json.load(open(root+"results/service-profile-gemma4-smoke.json")); assert all(p[r]["model_id"]==c["models"][r]["model_id"] and p[r]["model_revision"]==c["models"][r]["revision"] and p[r]["output_tokens_median"]>0 for r in ("edge","cloud")); print({r:(p[r]["model_id"],p[r]["model_revision"],p[r]["output_tokens_median"],p[r]["peak_cuda_memory_bytes"]) for r in ("edge","cloud")})'
+MANIFEST=$ROOT/results/tau2-router-splits.json
+
+python scripts/build_tau2_task_manifest.py \
+  "$TAU2_REPO" \
+  "$MANIFEST" \
+  --split-seed 20260806 \
+  --dev-fraction 0.30
 ```
 
-Do not edit quantization or retry with another model after an OOM. Return the
-error and peak-memory information so the formal config can be revised once.
+预期内部计数：
 
-## Step 6: Fresh Gemma Service Profile
+```text
+airline train=21 dev=9
+retail  train=52 dev=22
+telecom train=52 dev=22
+total   train=125 dev=53
+```
 
-The old service-profile JSON is forbidden as a latency/model profile; only its
-`network_trace.source` provenance string may be read. The raw real network
-trace may be reused only if
-`/root/autodl-tmp/AgentRelay/datasets/network/trace.csv` still exists, its
-`mbps` column is valid, and its original acquisition source is copied exactly.
-The model file used to record network throughput is not an inference model and
-does not alter the E4B/12B experiment pair.
+## 6. 重新生成 Gemma 服务 profile
+
+沿用之前真实采集的网络 trace；旧 service profile 只能用于找回 trace 的来源说明，不能作为本轮模型延迟。
 
 ```bash
-test -s /root/autodl-tmp/AgentRelay/datasets/network/trace.csv
-test -s /root/autodl-tmp/AgentRelay/results/service-profile.json
-python -c 'import csv,statistics; p="/root/autodl-tmp/AgentRelay/datasets/network/trace.csv"; rows=list(csv.DictReader(open(p))); assert len(rows)>=30; values=[float(r["mbps"]) for r in rows]; assert min(values)>=0 and statistics.median(values)>0; print("trace_samples",len(values),"median_mbps",statistics.median(values),"max_mbps",max(values))'
-TRACE_SOURCE="$(python -c 'import json; p=json.load(open("/root/autodl-tmp/AgentRelay/results/service-profile.json")); print(p["network_trace"]["source"])')"
+TRACE=$ROOT/datasets/network/trace.csv
+OLD_PROFILE=$ROOT/results/service-profile.json
+PROFILE=$ROOT/results/service-profile-gemma4.json
+
+test -s "$TRACE"
+test -s "$OLD_PROFILE"
+TRACE_SOURCE="$(python -c 'import json; print(json.load(open("/root/autodl-tmp/AgentRelay/results/service-profile.json"))["network_trace"]["source"])')"
 test -n "$TRACE_SOURCE"
 
 python scripts/profile_models.py \
   "$LOCK" \
-  /root/autodl-tmp/AgentRelay/results/service-profile-gemma4.json \
+  "$PROFILE" \
   --repeats 3 \
-  --network-trace /root/autodl-tmp/AgentRelay/datasets/network/trace.csv \
+  --network-trace "$TRACE" \
   --rate-column mbps \
   --sample-period-ms 1000 \
   --trace-source "$TRACE_SOURCE"
 ```
 
-If the raw trace is absent or invalid, stop here and return that fact. Do not
-insert a constant/default bandwidth and do not reuse the old Qwen profile.
+profile 中每个 role 必须同时包含 `model_id`、`model_revision`、`model_source`、`dtype` 和 `quantization`。本命令先 E4B 后 12B，顺序加载并释放。
 
-## Step 7: WebShop Official Train/Dev Learnability Gate
-
-Run this only after G0-G7 pass:
+## 7. 三域 text-mode smoke
 
 ```bash
-python scripts/run_webshop_train_dev_gate.py \
-  --config "$LOCK" \
-  --profile /root/autodl-tmp/AgentRelay/results/service-profile-gemma4.json \
-  --webshop-file /root/autodl-tmp/AgentRelay/repositories/webshop/data/items_shuffle.json \
-  --revision 64fa2a5c15c7daa698b9ac93f5bb5437b634c9bd \
-  --output-dir /root/autodl-tmp/AgentRelay/results/webshop-train-dev-gate
+SMOKE=$ROOT/results/tau2-text-smoke
+
+python scripts/run_tau2_text_smoke.py \
+  "$LOCK" \
+  "$PROFILE" \
+  "$MANIFEST" \
+  "$TAU2_REPO" \
+  "$ROOT/configs/tau2-user-simulator.json" \
+  "$SMOKE"
 ```
 
-The four endpoint runs are sequential and single-model-resident. If SSH or the
-process is interrupted, rerun exactly the same command and output directory;
-the built-in manifest validation controls safe resume without manual hash work.
+必须生成 `smoke-report.json`，且 `domains` 为 airline/retail/telecom、`paired_tasks=3`。此步通过后才进入 sensitivity。
 
-- Exit `0`: gate passed. Return artifacts; still do not run official test.
-- Exit `2`: gate completed but failed empirically. Return artifacts and stop
-  WebShop expansion; the next project decision is a Tau2/InterCode adapter gate.
-- Any other exit: runtime/integrity failure. Return the log and receipt; do not
-  reinterpret it as an empirical failure.
+## 8. E4B FP16/4-bit sensitivity
 
-## Step 8: Required Return Packet
+```bash
+SENS=$ROOT/results/tau2-e4b-precision-sensitivity
 
-Return all of the following without editing their contents:
-
-1. `formal-autodl-4090d.locked.json`.
-2. `results/preflight-gemma4.json`.
-3. `results/service-profile-gemma4-smoke.json`.
-4. `results/service-profile-gemma4.json`.
-5. `results/webshop-train-dev-gate/receipt.json`.
-6. `results/webshop-train-dev-gate/router-webshop-train-dev-gate.json`.
-7. Both paired endpoint JSONL files and the router metadata/artifact.
-8. The four run directories named in the receipt, including every
-   `run-context.json`, `manifest.json`, and episode result.
-9. Complete console logs and the final process exit code.
-
-No separate SHA256 sidecar or manually copied Git/file hash is required for
-upload. Internal model/data revisions and manifest self-checks remain automatic
-experiment-integrity fields.
-
-Do not run official WebShop test tasks, the full baseline matrix, ablations, or
-paper-result generation until this packet is independently reviewed.
-
-## Proposed `ccfa.yaml` Update After Handoff
-
-Do not apply this state change before the cloud results are returned and
-audited. At that point the orchestrator should update:
-
-```yaml
-stage:
-  gate: "webshop_train_dev_reward_router_gate_audited"
-constraints:
-  hardware:
-    local_debug: "software_only_no_gemma_models"
-artifacts:
-  cloud_4090d_handoff: "docs/cloud-4090d-handoff-plan-20260806.md"
+python scripts/run_tau2_precision_sensitivity.py \
+  "$LOCK" \
+  "$PROFILE" \
+  "$MANIFEST" \
+  "$TAU2_REPO" \
+  "$ROOT/configs/tau2-user-simulator.json" \
+  "$SENS" \
+  --tasks-per-domain 3
 ```
 
-The next owner after the returned packet is `ccf-integrity-auditor`. If the
-gate passes, hand off to `ccf-experiment-designer`; if it fails, hand off to
-the implementation owner for the preselected Tau2/InterCode capability gate.
+此命令串行运行 E4B 正式 NF4/BF16-compute 和 E4B FP16，共 9 个相同任务。结果只用于判断量化敏感性；无论结果如何，下一步正式成对 gate 仍由锁定配置控制为 E4B/12B 同为 4-bit。
+
+## 9. train/dev reward-aware router 门控
+
+```bash
+GATE=$ROOT/results/tau2-train-dev-gate
+
+python scripts/run_tau2_train_dev_gate.py \
+  "$LOCK" \
+  "$PROFILE" \
+  "$MANIFEST" \
+  "$TAU2_REPO" \
+  "$ROOT/configs/tau2-user-simulator.json" \
+  "$GATE"
+STATUS=$?
+echo "tau2_gate_exit=$STATUS"
+```
+
+该命令严格串行运行：train edge → train cloud → dev edge → dev cloud；每个任务单独原子落盘。SSH 中断后，用完全相同的命令和输出目录重跑即可。
+
+- exit 0：预声明可学习性门控通过。
+- exit 2：实验完整执行，但 router 门控未达标。回传所有文件并停止。
+- 其他非零：依赖、API、模型、provenance 或任务执行错误。不要解释为经验失败。
+
+若固定 user simulator 的 step-zero 输出在 edge/cloud 两次执行中不一致，配对会 fail closed；不能手工修改 features 或 episode 让其通过。
+
+## 10. 回传文件
+
+回传以下内容和完整 console log：
+
+1. `formal-autodl-4090d.locked.json`
+2. `results/preflight-gemma4.json`
+3. `results/preflight-tau2.json`
+4. `results/tau2-router-splits.json`
+5. `results/service-profile-gemma4.json`
+6. `results/tau2-text-smoke/` 全目录
+7. `results/tau2-e4b-precision-sensitivity/` 全目录
+8. `results/tau2-train-dev-gate/` 全目录
+9. 最终 `tau2_gate_exit`
+
+不要回传 `OPENAI_API_KEY`。不需要额外制作 SHA256 sidecar，也不需要人工抄录 Git 哈希；runner 的 `run-context.json`、episode hash 和 receipt 已自动记录这些约束。
+
+在本地审计这些文件之前，不运行 τ² test、WebShop 扩展、baseline matrix、ablation 或论文写作。

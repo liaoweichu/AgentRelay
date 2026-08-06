@@ -8,7 +8,7 @@ Status: planned; no result value has been generated
 
 | Claim | Reviewer question | Required evidence | Benchmarks | Strong baselines | Primary metrics | Status |
 | --- | --- | --- | --- | --- | --- | --- |
-| C1 ContinuationTax | Does complete continuation overhead change a routing decision or define a repeatable no-switch region? | Component latency/bytes, phase diagram, and paired zero-tax vs measured-tax native route validation | ALFWorld, WebShop, AppWorld | model-only step router, AgentRouter-style classifier, Hera-style router | route-reversal rate, phase boundary, tax share, p50/p95 latency, switch churn | planned |
+| C1 ContinuationTax | Does complete continuation overhead change a routing decision or define a repeatable no-switch region? | Component latency/bytes, phase diagram, and paired zero-tax vs measured-tax native route validation | τ² primary; ALFWorld/WebShop/AppWorld stress | model-only step router, AgentRouter-style classifier, Hera-style router | route-reversal rate, phase boundary, tax share, p50/p95 latency, switch churn | planned |
 | C2 Obligation-closed continuation | Does dependency closure preserve what the target needs more efficiently than summaries or typed fields alone? | Size-matched forced-handoff comparison, missing-predecessor diagnostics, and selective-patch analysis | all three; AgentProcessBench for local diagnostics only | full replay, truncation, summary, snapshot, typed delta without dependency edges, closed packet without patch | closure/invariant recall, provenance validity, downstream success, patch precision/bytes, transfer size | planned |
 | C3 Calibrated joint routing | Does joint executor/continuation/commit/dwell control improve the end-to-end frontier while respecting validation risk targets? | Frozen-policy full-split comparison plus calibration coverage/risk analysis | all three | edge/cloud-only, RouteLLM, FrugalGPT, model-only step router, Hera-style, uncalibrated joint router | success/reward, latency, cloud-step ratio, transfer, coverage, risk violations, dwell, Pareto frontier | planned |
 | C4 Effect-frontier coupling | Does making effect progress constrain migration prevent duplicate/conflicting mutations beyond a routing-independent barrier? | Controlled interruption at effect lifecycle points in official sandbox tools | AppWorld primary; read-only control on ALFWorld/WebShop | no ledger, dedupe-only, routing-independent barrier, Atomix/Cordon-inspired frontier without joint routing, full AgentRelay | duplicate/conflicting effects, final-state correctness, blocked migrations, recovery latency | planned |
@@ -18,6 +18,14 @@ Status: planned; no result value has been generated
 All tasks are real, public benchmark data. No task is invented, paraphrased, or modified. Native model rollouts on training tasks are run artifacts, not a replacement dataset.
 
 ### 2.1 Main benchmarks
+
+#### τ²-bench (primary learnability workload)
+
+- Repository fixed to `0ed2fd8d830a20657d89ae9c2efcc94838aa7129`, before the τ³ transition.
+- Text-mode domains: airline, retail, and telecom with the official environment, evaluator, policy, tools, and user simulator.
+- Router train/dev: deterministic domain-stratified 70/30 partition of official `train` only (125/53 tasks). Official `test` is sealed until the gate and its audit pass.
+- Fixed user simulator: `configs/tau2-user-simulator.json`; identical model, prompt policy, seed, and decoding for both endpoint arms.
+- Role endpoints run sequentially and must expose identical step-zero public features before reward-aware router fitting.
 
 #### ALFWorld
 
@@ -62,7 +70,8 @@ All tasks are real, public benchmark data. No task is invented, paraphrased, or 
 ### 3.1 Main open-model pair
 
 - Edge executor: `google/gemma-4-E4B-it` at an immutable revision.
-- Cloud-equivalent executor: `google/gemma-4-12b-it` at an immutable revision, using the declared memory-safe loading precision.
+- Cloud-equivalent executor: `google/gemma-4-12b-it` at an immutable revision.
+- Both formal endpoints are loaded from ModelScope as NF4 4-bit with BF16 compute. E4B FP16 is a separate diagnostic sensitivity arm and never enters router training.
 - Both use the same official chat template policy, thinking mode, token budget, greedy decoding, and seed. The config validator rejects any other formal model identity or unpaired decoding control.
 - Rationale: the same Gemma 4 family reduces prompt/tokenizer confounds while preserving a measured capability gap; fixed endpoints run sequentially on a 24 GB 4090D.
 
@@ -81,7 +90,7 @@ All tasks are real, public benchmark data. No task is invented, paraphrased, or 
 
 ### 3.4 Hardware stages
 
-- RTX 4080 Laptop: dependency checks, unit tests, and at most a small stratified debug batch. Results are diagnostic only.
+- RTX 4080 Laptop: software/dependency checks only; Gemma weights are absent and no model result is produced locally.
 - AutoDL RTX 4090D: all router fitting, complete native inference, main comparisons, ablations, stress tests, and reported measurements.
 - Store models, datasets, traces, checkpoints, logs, and results under `/root/autodl-tmp/AgentRelay`.
 

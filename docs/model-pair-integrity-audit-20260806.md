@@ -57,7 +57,7 @@ Frozen pair: edge `google/gemma-4-E4B-it`; cloud `google/gemma-4-12b-it`
 | high | Legacy Qwen matrix contained a stale `paper_evidence=true` label | preserved bit-for-bit but superseded and excluded by project evidence policy |
 | high | Historical local locked config could still be executed | blocked by default validation; allowed only inside non-evidence historical run audit |
 | medium | Existing Gemma gate used mutable ModelScope `master` snapshots | excluded from evidence; cloud run must resolve immutable revisions first |
-| medium | Fresh 4080 native smoke for both Gemma roles has not run | still open; run roles sequentially, and do not substitute another model if 12B does not fit |
+| medium | Local 4080 does not contain either Gemma checkpoint | intentional; run the tracked τ² smoke sequentially on 4090D and do not substitute another model |
 
 ## Safe Edit and Execution Rules
 

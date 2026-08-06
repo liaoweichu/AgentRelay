@@ -5,11 +5,13 @@ CCFA-managed research project for a step-criticality-aware edge-cloud handoff ru
 ## Current status
 
 - Stage: implementation and software verification
-- Active gate: WebShop official-train/dev reward-router learnability on AutoDL RTX 4090D
+- Active gate: τ²-bench three-domain train/dev reward-router learnability on AutoDL RTX 4090D
 - Provisional venue: MLSys 2027, with TSC as a possible extension/fallback
 - Local verification: software-only on RTX 4080 Laptop; no Gemma model inference
 - Formal experiments: AutoDL RTX 4090D (24 GB)
-- Frozen model pair: edge `google/gemma-4-E4B-it`; cloud `google/gemma-4-12b-it`
+- Frozen ModelScope pair: edge `google/gemma-4-E4B-it`; cloud `google/gemma-4-12b-it`
+- Formal precision: both endpoints NF4 4-bit with BF16 compute; E4B FP16 is sensitivity-only
+- Local τ² checkout: `repositories/tau2-bench` at pinned revision `0ed2fd8d…`; excluded from the parent Git worktree
 - Dataset policy: real public datasets and official splits only
 - Storage on AutoDL: `/root/autodl-tmp/AgentRelay`
 
@@ -33,10 +35,11 @@ columns; it is never used for tuning, model selection, or manuscript tables.
 
 Before the next AutoDL run, lock the active template and run
 `python scripts/audit_model_pair.py`; both commands fail unless the exact Gemma
-4 E4B/12B identities and paired decoding controls are present. Then run the resumable,
-one-command paired WebShop train/dev gate in `docs/webshop-train-dev-gate.md`.
-Endpoint code/config/profile/model/manifest provenance is checked before
-fitting; the official test split remains blocked until that gate passes.
+4 E4B/12B identities and paired decoding controls are present. The active
+cloud sequence is the pinned τ² three-domain smoke, E4B precision sensitivity,
+and resumable train/dev gate in `docs/cloud-4090d-handoff-plan-20260806.md`.
+Endpoint code/config/profile/model/user-simulator/task provenance is checked
+before fitting; the official τ² test split remains blocked.
 
 ## Layout
 
@@ -59,7 +62,7 @@ Project state is tracked in `ccfa.yaml`.
 
 The executable core includes obligation-closed content-addressed continuations,
 named-predecessor patching, calibrated risk bounds, semi-Markov executor/state/
-commit routing, effect-frontier migration masks, native Hugging Face execution,
-official ALFWorld/WebShop/AppWorld adapters, immutable run manifests, runnable
+commit routing, effect-frontier migration masks, native ModelScope/Hugging Face
+execution, official τ²/ALFWorld/WebShop/AppWorld adapters, immutable run manifests, runnable
 baselines, and paired statistical analysis. See `docs/execution-guide.md` for
 the strict local/formal separation.

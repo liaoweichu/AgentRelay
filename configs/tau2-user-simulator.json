@@ -1,0 +1,12 @@
+{
+  "schema_version": "1.0",
+  "implementation": "official_tau2_user_simulator",
+  "model": "openai/gpt-4.1-mini-2025-04-14",
+  "model_revision": "gpt-4.1-mini-2025-04-14",
+  "api_key_env": "OPENAI_API_KEY",
+  "temperature": 0.0,
+  "max_tokens": 512,
+  "seed": 300,
+  "benchmark_revision": "0ed2fd8d830a20657d89ae9c2efcc94838aa7129",
+  "prompt_policy": "official_tau2_v0.2.1_unmodified"
+}

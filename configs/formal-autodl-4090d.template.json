@@ -59,6 +59,12 @@
   ],
   "repositories": [
     {
+      "name": "tau2-bench",
+      "url": "https://github.com/sierra-research/tau2-bench.git",
+      "requested_revision": "0ed2fd8d830a20657d89ae9c2efcc94838aa7129",
+      "revision": "UNLOCKED"
+    },
+    {
       "name": "alfworld",
       "url": "https://github.com/alfworld/alfworld.git",
       "requested_revision": "HEAD",
@@ -78,6 +84,16 @@
     }
   ],
   "benchmarks": {
+    "tau2": {
+      "repository_revision": "0ed2fd8d830a20657d89ae9c2efcc94838aa7129",
+      "domains": ["airline", "retail", "telecom"],
+      "upstream_training_split": "train",
+      "held_out_split": "test",
+      "max_steps": 100,
+      "max_errors": 10,
+      "text_mode_only": true,
+      "purpose": "primary_router_learnability"
+    },
     "alfworld": {
       "evaluation_splits": ["valid_seen", "valid_unseen"],
       "max_steps": 50,

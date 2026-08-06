@@ -10,7 +10,7 @@ target_venue:
   status: "provisional"
 stage:
   current: "implementation"
-  gate: "gemma4_pair_locked_before_train_dev_gate"
+  gate: "tau2_three_domain_cloud_execution_pending"
   updated_at: "2026-08-06"
 constraints:
   models:
@@ -23,7 +23,7 @@ constraints:
     public_only: true
     synthetic_tasks_prohibited: true
     official_splits_required: true
-    ecosystem: "Hugging Face Datasets"
+    ecosystem: "official tau2 repository plus declared public datasets"
   hardware:
     local_debug: "RTX 4080 Laptop"
     formal_experiments: "AutoDL RTX 4090D (24 GB)"
@@ -58,6 +58,9 @@ artifacts:
   execution_guide: "docs/execution-guide.md"
   autodl_handoff: "docs/autodl-handoff.md"
   webshop_train_dev_gate: "docs/webshop-train-dev-gate.md"
+  tau2_cloud_handoff: "docs/cloud-4090d-handoff-plan-20260806.md"
+  tau2_user_simulator: "configs/tau2-user-simulator.json"
+  tau2_adapter: "src/agentrelay/tau2_adapter.py"
   webshop_gate50_audit: "artifacts/local-data/results/webshop-gemma4-gate50-audited.json"
   certified_local_run: "artifacts/local-data/runs/local-smoke-20260805T091401934426Z-1a137502"
   manuscript: "manuscript/main.tex"
@@ -92,7 +95,7 @@ experiments:
   - id: "SW-CHECK"
     scope: "software_correctness_only"
     status: "passed"
-    result: "57 unit tests and source compilation passed; exact Gemma 4 E4B/12B formal-pair guards, official WebShop split guards, loop recovery, task-level reward router, provenance-checked resumable train/dev gate, 12 routing methods, and 7 continuation codecs implemented; no paper result produced"
+    result: "65 software tests and source compilation passed; pinned ModelScope dependency/preflight, tau2 commit/split guards, three-domain adapter and smoke runner, fixed user simulator, E4B precision sensitivity, reward-aware train/dev gate, provenance and strict resume are implemented; no model or paper result produced locally"
   - id: "E0"
     scope: "historical_local_diagnostic"
     status: "excluded_non_gemma_non_evidence"
@@ -102,12 +105,16 @@ experiments:
     status: "audited_non_evidence"
     result: "Corrected paired summary: edge/cloud reward 0.160/0.187, oracle reward 0.2937, edge/cloud exclusive successes 2/3, one shared success, union success 12%; split_validated=false"
   - id: "WS-ROUTER-GATE"
-    scope: "official_train_dev_learnability"
+    scope: "secondary_webshop_stress_test"
+    status: "deferred_after_tau2_gate"
+    result: "Implemented but no longer the primary learnability workload because the audited Gemma pair success band is too low"
+  - id: "TAU2-ROUTER-GATE"
+    scope: "official_train_derived_three_domain_learnability"
     status: "ready_for_autodl_4090d"
-    result: "One-command resumable code and predeclared checks ready for 200 paired official-train and 100 paired official-dev tasks with frozen Gemma 4 E4B/12B identities; fixed endpoints run in separate single-model processes; endpoint code/config/profile/model/manifest provenance is enforced; official test remains blocked"
+    result: "Pinned tau2 commit; 125 internal train and 53 internal dev tasks drawn only from official train; sequential E4B/12B fixed endpoints, official evaluator/user simulator, reward-aware router, provenance, and strict resume implemented; official test remains blocked"
   - id: "E1-E7"
     scope: "formal_autodl"
-    status: "blocked_until_webshop_train_dev_gate_passes"
+    status: "blocked_until_tau2_train_dev_gate_is_audited"
 reviews: []
 revision_ledger:
   path: "reviews/revision-ledger.md"

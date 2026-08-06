@@ -26,6 +26,7 @@ ml = [
   "bitsandbytes>=0.44; platform_system == 'Linux'",
   "datasets>=3.0,<5",
   "huggingface-hub>=0.26,<1",
+  "modelscope==1.39.1",
   "numpy>=1.26",
   "safetensors>=0.4,<1",
   "scikit-learn>=1.5",
@@ -49,3 +50,7 @@ where = ["src"]
 [tool.ruff]
 line-length = 100
 target-version = "py310"
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+norecursedirs = ["repositories"]

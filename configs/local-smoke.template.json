@@ -7,6 +7,7 @@
   "models": {
     "edge": {
       "model_id": "google/gemma-4-E4B-it",
+      "model_source": "modelscope",
       "requested_revision": "main",
       "revision": "UNLOCKED",
       "dtype": "bfloat16",
@@ -22,6 +23,7 @@
     },
     "cloud": {
       "model_id": "google/gemma-4-12b-it",
+      "model_source": "modelscope",
       "requested_revision": "main",
       "revision": "UNLOCKED",
       "dtype": "bfloat16",

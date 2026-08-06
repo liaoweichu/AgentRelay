@@ -66,6 +66,11 @@ def resolve_modelscope(repo_id: str, requested: str) -> str:
 
 
 def resolve_git(url: str, requested: str) -> str:
+    # A full commit is already immutable.  It may be reachable without being
+    # advertised by ls-remote (the pinned tau2-bench revision is one example),
+    # so checkout_repositories.py performs the authoritative fetch/HEAD check.
+    if FULL_COMMIT_RE.fullmatch(requested):
+        return requested.lower()
     result = subprocess.run(
         ["git", "ls-remote", url, requested],
         check=True,
