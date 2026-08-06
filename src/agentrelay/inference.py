@@ -31,6 +31,9 @@ class NativeGenerationConfig:
     model_id: str
     revision: str
     dtype: str = "bfloat16"
+    # Where the pinned revision lives.  "huggingface" downloads through the
+    # Hugging Face Hub cache; "modelscope" resolves a ModelScope snapshot dir.
+    model_source: str = "huggingface"
     quantization: str = "none"
     device_map: str = "auto"
     max_new_tokens: int = 512
@@ -50,7 +53,11 @@ class NativeGenerationConfig:
         if not self.model_id or "/" not in self.model_id:
             raise ValueError("model_id must be a Hugging Face repository identifier")
         require_immutable_revision(self.revision, subject=self.model_id)
-        if self.dtype not in {"float16", "bfloat16", "float32", "auto"}:
+        if self.model_source not in {"huggingface", "modelscope"}:
+            raise ValueError(
+                f"unsupported model_source: {self.model_source!r} (expected huggingface or modelscope)"
+            )
+        if not self.dtype or self.dtype not in {"float16", "bfloat16", "float32", "auto"}:
             raise ValueError(f"unsupported dtype: {self.dtype}")
         if self.quantization not in {"none", "bnb_4bit", "bnb_8bit", "repository"}:
             raise ValueError(f"unsupported quantization: {self.quantization}")
@@ -120,6 +127,47 @@ class HFModelExecutor:
         # adapter.  Both route reasoning through enable_thinking.
         self._uses_processor = config.architecture in {"multimodal_lm", "gemma_causal_lm"}
         self._uses_thinking = config.architecture in {"multimodal_lm", "gemma_causal_lm"}
+        if config.model_source == "modelscope":
+            # Resolve the immutable ModelScope snapshot directory and load
+            # straight from disk so no Hugging Face Hub revision lookup occurs.
+            model_root = self._resolve_modelscope_snapshot(config, storage)
+            lookup: dict[str, Any] = {
+                "trust_remote_code": config.trust_remote_code,
+                "local_files_only": config.local_files_only,
+            }
+            if self._uses_processor:
+                self.tokenizer = AutoProcessor.from_pretrained(model_root, **lookup)
+            else:
+                self.tokenizer = AutoTokenizer.from_pretrained(model_root, **lookup)
+            model_kwargs = dict(lookup)
+            model_kwargs["device_map"] = config.device_map
+            if config.dtype != "auto":
+                model_kwargs["dtype"] = getattr(torch, config.dtype)
+            else:
+                model_kwargs["dtype"] = "auto"
+            if config.quantization == "bnb_4bit":
+                model_kwargs["quantization_config"] = BitsAndBytesConfig(
+                    load_in_4bit=True,
+                    bnb_4bit_compute_dtype=torch.bfloat16,
+                    bnb_4bit_quant_type="nf4",
+                    bnb_4bit_use_double_quant=True,
+                )
+            elif config.quantization == "bnb_8bit":
+                model_kwargs["quantization_config"] = BitsAndBytesConfig(load_in_8bit=True)
+            if config.architecture in {"multimodal_lm", "gemma_causal_lm"}:
+                try:
+                    from transformers import AutoModelForMultimodalLM
+                except ImportError as exc:
+                    raise RuntimeError(
+                        "this Gemma 4 architecture requires a Transformers build with "
+                        "AutoModelForMultimodalLM support"
+                    ) from exc
+                model_cls = AutoModelForMultimodalLM
+            else:
+                model_cls = AutoModelForCausalLM
+            self.model = model_cls.from_pretrained(model_root, **model_kwargs)
+            self.model.eval()
+            return
         common: dict[str, Any] = {
             "revision": config.revision,
             "cache_dir": str(storage.models),
@@ -164,6 +212,43 @@ class HFModelExecutor:
             model_cls = AutoModelForCausalLM
         self.model = model_cls.from_pretrained(config.model_id, **model_kwargs)
         self.model.eval()
+
+    @staticmethod
+    def _resolve_modelscope_snapshot(
+        config: NativeGenerationConfig, storage: StorageLayout
+    ) -> str:
+        """Download (or reuse) the pinned ModelScope commit into the models cache.
+
+        ModelScope's snapshot_download writes ``snapshots/<revision>`` under the
+        cache dir, mirroring the Hugging Face cache contract.  The resolved
+        revision is an immutable 40-hex ModelScope commit, so the returned path
+        is stable and reproducible.
+        """
+        try:
+            from modelscope import snapshot_download
+        except ImportError as exc:
+            raise RuntimeError(
+                "model_source=modelscope requires the 'modelscope' package"
+            ) from exc
+        storage.create()
+        # If the pinned snapshot is already fully materialized locally, load it
+        # straight from disk so the run stays reproducible and offline.
+        repo_dir = storage.models / "models" / config.model_id.replace("/", "--")
+        local_snapshot = repo_dir / "snapshots" / config.revision
+        if (local_snapshot / "model.safetensors").is_file():
+            return str(local_snapshot)
+        path = snapshot_download(
+            config.model_id,
+            revision=config.revision,
+            cache_dir=str(storage.models),
+            # Never silently fall back to master when the pinned commit is gone.
+            local_files_only=config.local_files_only,
+        )
+        if not str(path).endswith(config.revision):
+            raise RuntimeError(
+                f"ModelScope resolved {path!r} which does not match pinned revision {config.revision!r}"
+            )
+        return str(path)
 
     def _input_device(self) -> Any:
         try:

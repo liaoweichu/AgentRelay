@@ -118,7 +118,11 @@ def check_webshop_action(
                 f"search[...] or click[...] action. Current actions include: {examples}"
             ),
         )
-    if action.lower() in attempted:
+    # A WebShop search always re-executes the query and produces a fresh results
+    # page, so it can never be "already attempted without progress" even when the
+    # agent returns to the (byte-identical) home page and re-searches.  Only the
+    # repeat-click heuristic should suppress actions that truly leave state fixed.
+    if action.lower() in attempted and not action.lower().startswith("search["):
         return WebShopActionCheck(
             action=action,
             accepted=False,
@@ -163,4 +167,12 @@ def webshop_fallback_action(
     for normalized, action in valid.items():
         if normalized != "search[<keywords>]" and normalized not in attempted:
             return action
+    # Last-resort recovery on the home/search page: a search always re-executes
+    # the query and yields fresh state, so re-issuing the goal search (even if
+    # previously attempted) is legitimate progress rather than a no-progress loop.
+    if "search[<keywords>]" in valid:
+        keywords = " ".join(str(goal).split())[:400].strip()
+        candidate = f"search[{keywords}]" if keywords else ""
+        if candidate:
+            return candidate
     return None

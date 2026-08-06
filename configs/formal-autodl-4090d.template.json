@@ -7,10 +7,11 @@
   "models": {
     "edge": {
       "model_id": "google/gemma-4-E4B-it",
-      "requested_revision": "main",
+      "model_source": "modelscope",
+      "requested_revision": "master",
       "revision": "UNLOCKED",
       "dtype": "bfloat16",
-      "quantization": "none",
+      "quantization": "bnb_4bit",
       "device_map": "auto",
       "max_new_tokens": 1024,
       "do_sample": false,
@@ -22,7 +23,8 @@
     },
     "cloud": {
       "model_id": "google/gemma-4-12b-it",
-      "requested_revision": "main",
+      "model_source": "modelscope",
+      "requested_revision": "master",
       "revision": "UNLOCKED",
       "dtype": "bfloat16",
       "quantization": "bnb_4bit",
