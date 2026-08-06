@@ -14,28 +14,29 @@ train/dev learnability gate. Do not run the official test split.
   train/dev rollouts.
 - Do not reuse the old Qwen service profile or legacy matrix. Do not treat a
   ModelScope `snapshots/master` directory as an immutable model revision.
-- Do not start until the model-policy changes are committed and pushed. The
-  cloud operator must receive the exact commit as `<MODEL_POLICY_COMMIT>`.
+- Start after the model-policy changes are committed and pushed to `main`.
+  Pull the latest `main`; no Git SHA or upload-file hash needs to be recorded or
+  compared manually.
 
 ## Execution Plan Table
 
 | Gate | Cloud action | Required output | Pass condition | Stop / return condition |
 | --- | --- | --- | --- | --- |
-| G0 | Check out the exact handed-off Git commit | `git rev-parse HEAD` and clean `git status --short` | SHA equals `<MODEL_POLICY_COMMIT>`; working tree is clean | Any mismatch or cloud-local edit: stop; do not reset or overwrite it |
+| G0 | Pull the latest pushed `main` | clean `git status --short` and successful fast-forward pull | working tree is clean and `git pull --ff-only` succeeds | any cloud-local edit or merge conflict: stop; do not reset or overwrite it |
 | G1 | Bootstrap the isolated runtime under `/root/autodl-tmp/AgentRelay` | activated venv and `env.sh` | installation completes; all cache/temp variables point below the project root | dependency or disk failure: return the complete error log |
 | G2 | Run software and model-policy checks | unit-test log, compile status, model-pair audit JSON | 57 tests pass; compilation succeeds; audit says `valid=true` and exact E4B/12B IDs | any failure: stop before model loading |
-| G3 | Resolve every mutable model/data/repository reference | `formal-autodl-4090d.locked.json` | both model revisions and every dataset/repository revision are full immutable hashes | HF/Git resolution or access failure: stop; never derive a fake hash from a local path |
+| G3 | Resolve every mutable model/data/repository reference | `formal-autodl-4090d.locked.json` | `lock_config.py` and `check-config` succeed for the exact Gemma pair | HF/Git resolution or access failure: stop; never derive a fake revision from a local path |
 | G4 | Run hardware/storage preflight | `results/preflight-gemma4.json` | GPU name contains `4090`; memory is at least 20 GiB; CUDA and bitsandbytes load; paths are confined to persistent storage | any failed assertion: stop |
-| G5 | Download pinned data and check out official environments | dataset row/revision lines and three repository revision lines | every resolved revision equals the lock; WebShop preparation succeeds | missing or mismatched revision: stop |
+| G5 | Download pinned data and check out official environments | dataset row lines and three repository checkout lines | every command succeeds under the locked config; WebShop preparation succeeds | missing or mismatched locked asset: stop |
 | G6 | Sequentially smoke-test E4B and 12B through the tracked inference path | `results/service-profile-gemma4-smoke.json` | file contains exact IDs/revisions for both roles; both produce native nonempty output; only one model is resident at a time | OOM/load/parser failure: stop and return the file/log; do not change model, precision, thinking mode, or token budget |
 | G7 | Generate a fresh Gemma service profile using the retained real network trace | `results/service-profile-gemma4.json` | exact IDs/revisions match the lock; non-null positive bandwidth; profile self-hash exists | old Qwen IDs, null bandwidth, or trace failure: stop |
 | G8 | Run 200 paired official-train and 100 paired official-dev WebShop tasks | gate receipt, four endpoint runs, paired JSONL, router, gate JSON | command finishes with status 0 or declared gate-failure status 2; all provenance checks pass | status 2 means empirical gate failure: return artifacts and do not run test; any other error may be resumed only with the identical command |
-| G9 | Return the audit packet | files listed below plus run-directory paths | hashes and paths are complete enough for local independent review | do not start E1-E7 or manuscript work before review |
+| G9 | Return the audit packet | files listed below plus run-directory paths | files and paths are complete enough for local independent review | do not start E1-E7 or manuscript work before review |
 
-## Step 0: Exact-Code Gate
+## Step 0: Latest-Main Gate
 
-Replace `<MODEL_POLICY_COMMIT>` with the commit supplied after the current local
-changes are committed and pushed.
+No commit SHA or uploaded-file hash needs to be supplied. The cloud operator
+only pulls the latest pushed `main` with a clean working tree.
 
 ```bash
 cd /root/autodl-tmp/AgentRelay
@@ -43,15 +44,13 @@ git status --short
 git fetch origin
 git checkout main
 git pull --ff-only origin main
-git rev-parse HEAD
 git diff --exit-code
 git diff --cached --exit-code
-test "$(git rev-parse HEAD)" = "<MODEL_POLICY_COMMIT>"
 ```
 
 If the first `git status --short` is nonempty, stop and report it. Do not use
 `git reset --hard`, do not delete cloud files, and do not continue on a
-different commit.
+conflicted or locally modified tree.
 
 ## Step 1: Bootstrap and Software Gate
 
@@ -83,7 +82,7 @@ python scripts/lock_config.py \
   "$LOCK"
 
 python -m agentrelay.cli check-config "$LOCK"
-python -c 'import json,re; p=json.load(open("/root/autodl-tmp/AgentRelay/formal-autodl-4090d.locked.json")); expected={"edge":"google/gemma-4-E4B-it","cloud":"google/gemma-4-12b-it"}; assert {k:v["model_id"] for k,v in p["models"].items()}==expected; assert all(re.fullmatch(r"[0-9a-fA-F]{40,64}",v["revision"]) for v in p["models"].values()); print({k:(v["model_id"],v["revision"]) for k,v in p["models"].items()})'
+python -c 'import json; p=json.load(open("/root/autodl-tmp/AgentRelay/formal-autodl-4090d.locked.json")); expected={"edge":"google/gemma-4-E4B-it","cloud":"google/gemma-4-12b-it"}; assert {k:v["model_id"] for k,v in p["models"].items()}==expected; print({k:v["model_id"] for k,v in p["models"].items()})'
 ```
 
 If Hugging Face access or license authorization prevents revision resolution,
@@ -177,7 +176,7 @@ python scripts/run_webshop_train_dev_gate.py \
 
 The four endpoint runs are sequential and single-model-resident. If SSH or the
 process is interrupted, rerun exactly the same command and output directory;
-the receipt and episode hashes control safe resume.
+the built-in manifest validation controls safe resume without manual hash work.
 
 - Exit `0`: gate passed. Return artifacts; still do not run official test.
 - Exit `2`: gate completed but failed empirically. Return artifacts and stop
@@ -189,17 +188,20 @@ the receipt and episode hashes control safe resume.
 
 Return all of the following without editing their contents:
 
-1. Exact Git commit from `git rev-parse HEAD`.
-2. `formal-autodl-4090d.locked.json`.
-3. `results/preflight-gemma4.json`.
-4. `results/service-profile-gemma4-smoke.json`.
-5. `results/service-profile-gemma4.json`.
-6. `results/webshop-train-dev-gate/receipt.json`.
-7. `results/webshop-train-dev-gate/router-webshop-train-dev-gate.json`.
-8. Both paired endpoint JSONL files and the router metadata/artifact.
-9. The four run directories named in the receipt, including every
+1. `formal-autodl-4090d.locked.json`.
+2. `results/preflight-gemma4.json`.
+3. `results/service-profile-gemma4-smoke.json`.
+4. `results/service-profile-gemma4.json`.
+5. `results/webshop-train-dev-gate/receipt.json`.
+6. `results/webshop-train-dev-gate/router-webshop-train-dev-gate.json`.
+7. Both paired endpoint JSONL files and the router metadata/artifact.
+8. The four run directories named in the receipt, including every
    `run-context.json`, `manifest.json`, and episode result.
-10. Complete console logs and the final process exit code.
+9. Complete console logs and the final process exit code.
+
+No separate SHA256 sidecar or manually copied Git/file hash is required for
+upload. Internal model/data revisions and manifest self-checks remain automatic
+experiment-integrity fields.
 
 Do not run official WebShop test tasks, the full baseline matrix, ablations, or
 paper-result generation until this packet is independently reviewed.

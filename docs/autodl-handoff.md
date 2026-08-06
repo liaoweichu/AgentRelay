@@ -11,5 +11,5 @@ run sequentially on the AutoDL RTX 4090D.
 
 Do not use older archive-based handoff commands, the legacy Qwen service
 profile, the legacy matrix, or ModelScope `snapshots/master` as formal model
-provenance. Do not start the cloud run until the exact model-policy commit has
-been pushed and supplied as `<MODEL_POLICY_COMMIT>`.
+provenance. Start after the model-policy changes are pushed to `main`; no Git
+SHA or uploaded-file hash needs to be supplied or checked manually.
