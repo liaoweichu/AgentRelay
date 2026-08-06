@@ -1,0 +1,66 @@
+{
+  "schema_version": "1.0",
+  "formal_model_pair": {
+    "edge": "google/gemma-4-E4B-it",
+    "cloud": "google/gemma-4-12b-it"
+  },
+  "requirements": {
+    "immutable_model_revisions": true,
+    "manifest_model_ids_required": true,
+    "paired_decoding_required": true
+  },
+  "excluded_artifacts": [
+    {
+      "path_prefix": "configs/local-smoke.locked.json",
+      "reason": "Historical Qwen local diagnostic configuration; retained only to verify its immutable non-evidence run."
+    },
+    {
+      "path_prefix": "artifacts/local-data/runs/",
+      "reason": "Historical local diagnostics are explicitly paper_evidence=false and predate the frozen Gemma 4 pair."
+    },
+    {
+      "path_prefix": "cloud_results/final-matrix/",
+      "reason": "Legacy Qwen matrix; its embedded paper_evidence flag is superseded by this project evidence policy."
+    },
+    {
+      "path_prefix": "cloud_results/service-profile.json",
+      "reason": "Legacy Qwen hardware profile; it cannot satisfy the Gemma 4 config/profile identity check."
+    },
+    {
+      "path_prefix": "cloud_results/gate-webshop2-mix.json",
+      "reason": "Legacy development gate with no admissible frozen Gemma 4 provenance."
+    },
+    {
+      "path_prefix": "cloud_results/gate-webshop50-full.json",
+      "reason": "Gemma 4 diagnostic only: mutable ModelScope master snapshots and an invalid legacy test split prevent paper use."
+    },
+    {
+      "path_prefix": "cloud_results/train-episodes.jsonl",
+      "reason": "Legacy router training episodes tied to the excluded Qwen matrix."
+    },
+    {
+      "path_prefix": "cloud_results/validation-episodes.jsonl",
+      "reason": "Legacy router validation episodes tied to the excluded Qwen matrix."
+    },
+    {
+      "path_prefix": "cloud_results/router.joblib",
+      "reason": "Legacy router trained from excluded endpoint episodes."
+    },
+    {
+      "path_prefix": "cloud_results/router.joblib.metadata.json",
+      "reason": "Legacy router metadata tied to excluded endpoint episodes."
+    },
+    {
+      "path_prefix": "cloud_results/router-rows.jsonl",
+      "reason": "Legacy router rows tied to excluded endpoint episodes."
+    },
+    {
+      "path_prefix": "cloud_results/calibration-rows.jsonl",
+      "reason": "Legacy calibration rows tied to excluded endpoint episodes."
+    },
+    {
+      "path_prefix": "cloud_results/calibrator.json",
+      "reason": "Legacy calibrator tied to excluded endpoint episodes."
+    }
+  ]
+}

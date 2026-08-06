@@ -13,6 +13,7 @@ PROJECT_ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(PROJECT_ROOT / "src"))
 
 from agentrelay.gating import evaluate_router_learnability  # noqa: E402
+from agentrelay.config import GEMMA4_FORMAL_MODEL_PAIR  # noqa: E402
 from agentrelay.learning import JointRouterEstimator  # noqa: E402
 from agentrelay.router_data import (  # noqa: E402
     read_episode_records,
@@ -44,6 +45,7 @@ def _provenance_scope(episodes: tuple[dict, ...], *, label: str) -> dict:
             "code_revision",
             "config_hash",
             "profile_hash",
+            "model_ids",
             "model_revisions",
             "task_manifest_hash",
         )
@@ -59,10 +61,14 @@ def _provenance_scope(episodes: tuple[dict, ...], *, label: str) -> dict:
     model_payloads = {
         canonical_json(dict(item["model_revisions"])) for item in records
     }
+    model_id_payloads = {
+        canonical_json(dict(item["model_ids"])) for item in records
+    }
     if (
         len(code_revisions) != 1
         or len(config_hashes) != 1
         or len(profile_hashes) != 1
+        or len(model_id_payloads) != 1
         or len(model_payloads) != 1
     ):
         raise ValueError(f"{label} endpoints disagree on code/config/profile/models")
@@ -70,10 +76,14 @@ def _provenance_scope(episodes: tuple[dict, ...], *, label: str) -> dict:
         raise ValueError(f"{label} endpoints disagree on task manifest")
     if len(run_ids) != 2 or len(endpoint_manifests) != 2:
         raise ValueError(f"{label} must contain exactly two fixed-endpoint runs")
+    model_ids = json.loads(next(iter(model_id_payloads)))
+    if model_ids != GEMMA4_FORMAL_MODEL_PAIR:
+        raise ValueError(f"{label} endpoints do not use the frozen Gemma 4 model pair")
     return {
         "code_revision": next(iter(code_revisions)),
         "config_hash": next(iter(config_hashes)),
         "profile_hash": next(iter(profile_hashes)),
+        "model_ids": model_ids,
         "model_revisions": json.loads(next(iter(model_payloads))),
         "task_manifest_hash": next(iter(task_manifests)),
         "run_ids": sorted(run_ids),
@@ -104,6 +114,7 @@ def main() -> int:
         "code_revision",
         "config_hash",
         "profile_hash",
+        "model_ids",
         "model_revisions",
     ):
         if train_provenance[field] != dev_provenance[field]:

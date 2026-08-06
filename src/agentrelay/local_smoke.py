@@ -15,7 +15,12 @@ from pathlib import Path
 import sys
 from typing import Any, Iterable, Mapping, Sequence
 
-from .config import StorageLayout, load_json_config, validate_experiment_config
+from .config import (
+    GEMMA4_FORMAL_MODEL_PAIR,
+    StorageLayout,
+    load_json_config,
+    validate_experiment_config,
+)
 from .baselines import baseline_manifest
 from .continuation import closure_depth, render_semantic_continuation, build_standard_semantic_graph
 from .cost import HandoffMeasurement
@@ -431,6 +436,7 @@ def run_local_smoke(
     *,
     limit: int | None = None,
     subset: str | None = None,
+    model_role: str = "edge",
     command: Sequence[str] | None = None,
     required_gpu_name: str = "4080",
 ) -> LocalSmokeResult:
@@ -471,7 +477,16 @@ def run_local_smoke(
         dataset = dataset.select_columns(safe_columns)
     examples = _select_examples(dataset, limit=selected_limit, subset=subset)
 
-    model_role = "edge"
+    if model_role not in GEMMA4_FORMAL_MODEL_PAIR:
+        raise ValueError(f"unsupported Gemma 4 model role: {model_role!r}")
+    configured_model = config["models"].get(model_role)
+    if not isinstance(configured_model, Mapping):
+        raise ValueError(f"local smoke config has no {model_role!r} model")
+    expected_model_id = GEMMA4_FORMAL_MODEL_PAIR[model_role]
+    if str(configured_model.get("model_id", "")) != expected_model_id:
+        raise ValueError(
+            f"local smoke {model_role} must use the frozen model {expected_model_id!r}"
+        )
     model_config = NativeGenerationConfig.from_dict(config["models"][model_role])
     executor = HFModelExecutor(model_config, storage)
     torch = executor.torch
@@ -578,6 +593,7 @@ def run_local_smoke(
         dataset_revision=dataset_spec.revision,
         split=split,
         sample_ids=tuple(record.sample_id for record in records),
+        model_ids={model_role: model_config.model_id},
         model_revisions={model_role: model_config.revision},
         seed=model_config.seed,
         prompt=DIAGNOSTIC_SYSTEM_PROMPT,
@@ -590,6 +606,9 @@ def run_local_smoke(
     manifest.write(manifest_path)
     summary = {
         "run_id": run_id,
+        "model_role": model_role,
+        "model_id": model_config.model_id,
+        "model_revision": model_config.revision,
         "diagnostic_only": True,
         "paper_evidence": False,
         "labels_accessed": False,

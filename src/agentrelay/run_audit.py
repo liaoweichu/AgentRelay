@@ -90,7 +90,13 @@ def audit_run(
     config_valid = isinstance(config, Mapping)
     if config_valid:
         try:
-            validate_experiment_config(config)
+            validate_experiment_config(
+                config,
+                allow_legacy_local_models=(
+                    manifest.get("purpose") == "local_diagnostic_only"
+                    and config.get("paper_evidence") is False
+                ),
+            )
         except (KeyError, TypeError, ValueError):
             config_valid = False
     check("locked_config", config_valid, "embedded experiment config is invalid or unlocked")

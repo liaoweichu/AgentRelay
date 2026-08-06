@@ -13,6 +13,16 @@ from typing import Any, Mapping
 AUTODL_DEFAULT_ROOT_TEXT = "/root/autodl-tmp/AgentRelay"
 AUTODL_DEFAULT_ROOT = Path(AUTODL_DEFAULT_ROOT_TEXT)
 FULL_COMMIT_RE = re.compile(r"^[0-9a-f]{40,64}$", re.IGNORECASE)
+GEMMA4_EDGE_MODEL_ID = "google/gemma-4-E4B-it"
+GEMMA4_CLOUD_MODEL_ID = "google/gemma-4-12b-it"
+GEMMA4_FORMAL_MODEL_PAIR = {
+    "edge": GEMMA4_EDGE_MODEL_ID,
+    "cloud": GEMMA4_CLOUD_MODEL_ID,
+}
+GEMMA4_ARCHITECTURES = {
+    "edge": {"gemma_causal_lm", "multimodal_lm"},
+    "cloud": {"multimodal_lm"},
+}
 
 
 @dataclass(frozen=True)
@@ -64,10 +74,52 @@ def require_keys(config: Mapping[str, Any], keys: tuple[str, ...]) -> None:
         raise ValueError(f"configuration is missing keys: {', '.join(missing)}")
 
 
+def validate_gemma4_model_pair(models: Mapping[str, Any]) -> None:
+    """Require the frozen Gemma 4 edge/cloud pair used by every formal run."""
+
+    if set(models) != set(GEMMA4_FORMAL_MODEL_PAIR):
+        raise ValueError("formal runs require exactly the edge and cloud model roles")
+    for role, expected_id in GEMMA4_FORMAL_MODEL_PAIR.items():
+        model = models.get(role)
+        if not isinstance(model, Mapping):
+            raise ValueError(f"models.{role} must be an object")
+        if str(model.get("model_id", "")) != expected_id:
+            raise ValueError(
+                f"models.{role}.model_id must be the frozen Gemma 4 model {expected_id!r}"
+            )
+        architecture = str(model.get("architecture", ""))
+        if architecture not in GEMMA4_ARCHITECTURES[role]:
+            allowed = ", ".join(sorted(GEMMA4_ARCHITECTURES[role]))
+            raise ValueError(
+                f"models.{role}.architecture must be one of: {allowed}"
+            )
+
+    # Model capacity is the treatment.  Decoding must remain paired so a token
+    # budget, sampling, or thinking-mode difference cannot masquerade as routing gain.
+    paired_fields = (
+        "max_new_tokens",
+        "do_sample",
+        "temperature",
+        "top_p",
+        "seed",
+        "enable_thinking",
+    )
+    edge = models["edge"]
+    cloud = models["cloud"]
+    for field in paired_fields:
+        if field not in edge or field not in cloud:
+            raise ValueError(
+                f"Gemma 4 edge/cloud decoding field {field!r} must be explicit"
+            )
+        if edge.get(field) != cloud.get(field):
+            raise ValueError(f"Gemma 4 edge/cloud decoding field {field!r} must match")
+
+
 def validate_experiment_config(
     config: Mapping[str, Any],
     *,
     allow_unlocked: bool = False,
+    allow_legacy_local_models: bool = False,
 ) -> None:
     """Validate execution and integrity constraints before a run starts."""
 
@@ -138,6 +190,7 @@ def validate_experiment_config(
     if not isinstance(limits, Mapping):
         raise ValueError("limits must be an object")
     if mode == "formal_autodl":
+        validate_gemma4_model_pair(models)
         if str(config["data_root"]).replace("\\", "/") != AUTODL_DEFAULT_ROOT_TEXT:
             raise ValueError("formal runs must use /root/autodl-tmp/AgentRelay")
         if limits.get("sample_limit") is not None:
@@ -147,3 +200,5 @@ def validate_experiment_config(
     else:
         if config["paper_evidence"] is not False:
             raise ValueError("local smoke runs cannot be marked as paper evidence")
+        if not allow_legacy_local_models:
+            validate_gemma4_model_pair(models)

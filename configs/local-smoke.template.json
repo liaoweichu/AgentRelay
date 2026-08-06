@@ -6,14 +6,33 @@
   "hardware": "RTX 4080 Laptop",
   "models": {
     "edge": {
-      "model_id": "Qwen/Qwen2.5-1.5B-Instruct",
+      "model_id": "google/gemma-4-E4B-it",
       "requested_revision": "main",
       "revision": "UNLOCKED",
       "dtype": "bfloat16",
-      "quantization": "none",
+      "quantization": "bnb_4bit",
       "device_map": "auto",
       "max_new_tokens": 128,
       "do_sample": false,
+      "temperature": 1.0,
+      "top_p": 1.0,
+      "architecture": "multimodal_lm",
+      "enable_thinking": false,
+      "seed": 0
+    },
+    "cloud": {
+      "model_id": "google/gemma-4-12b-it",
+      "requested_revision": "main",
+      "revision": "UNLOCKED",
+      "dtype": "bfloat16",
+      "quantization": "bnb_4bit",
+      "device_map": "auto",
+      "max_new_tokens": 128,
+      "do_sample": false,
+      "temperature": 1.0,
+      "top_p": 1.0,
+      "architecture": "multimodal_lm",
+      "enable_thinking": false,
       "seed": 0
     }
   },

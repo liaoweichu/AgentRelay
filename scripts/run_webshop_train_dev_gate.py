@@ -15,6 +15,11 @@ PROJECT_ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(PROJECT_ROOT / "src"))
 
 from agentrelay.formal_matrix import OfficialTaskManifest  # noqa: E402
+from agentrelay.config import (  # noqa: E402
+    GEMMA4_FORMAL_MODEL_PAIR,
+    load_json_config,
+    validate_experiment_config,
+)
 from agentrelay.schema import canonical_json, sha256_json, sha256_text  # noqa: E402
 
 
@@ -70,6 +75,8 @@ def _load_run_manifest(root: Path, *, expected_method: str) -> dict:
         raise ValueError(f"resume run method mismatch: {root}")
     if value.get("paper_evidence") is not False:
         raise ValueError(f"resume run is not a train/dev diagnostic: {root}")
+    if value.get("model_ids") != GEMMA4_FORMAL_MODEL_PAIR:
+        raise ValueError(f"resume run does not use the frozen Gemma 4 model pair: {root}")
     return value
 
 
@@ -128,12 +135,15 @@ def main() -> int:
     for required in (config, profile, webshop_file):
         if not required.is_file():
             raise FileNotFoundError(required)
+    locked_config = load_json_config(config)
+    validate_experiment_config(locked_config)
     output = Path(args.output_dir).expanduser().resolve()
     output.mkdir(parents=True, exist_ok=True)
     plan = {
         "revision": args.revision,
         "config_hash": sha256_text(config.read_text(encoding="utf-8")),
         "profile_hash": sha256_text(profile.read_text(encoding="utf-8")),
+        "model_ids": dict(GEMMA4_FORMAL_MODEL_PAIR),
         "webshop_file": str(webshop_file),
         "train_count": args.train_count,
         "dev_count": args.dev_count,

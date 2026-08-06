@@ -522,10 +522,10 @@ from live GPU wall-clock latency.
 
 \subsection{Models and hardware}
 
-The primary pair uses Qwen2.5 instruction-tuned models
-\citep{qwen2024qwen25}: \texttt{Qwen2.5-1.5B-Instruct} as the edge executor
-in BF16 and \texttt{Qwen2.5-14B-Instruct} as the cloud-equivalent executor
-with 4-bit weight loading. A shared family reduces tokenizer and prompt-format
+The primary pair uses Gemma 4 instruction-tuned models
+\citep{gemma2026gemma4}: \texttt{google/gemma-4-E4B-it} as the edge executor
+and \texttt{google/gemma-4-12b-it} as the cloud-equivalent executor, each at an
+immutable revision and with the declared memory-safe loading precision. A shared family reduces tokenizer and prompt-format
 confounds while retaining a substantial capacity difference. Revisions are
 resolved and locked before any evidence run. Greedy decoding is the default;
 if an official harness requires sampling, three declared seeds are used
@@ -608,7 +608,7 @@ E2 & Forced matched-position handoffs & Fidelity and transfer size & C3 \\
 E3 & Zero-tax versus measured-tax replay & Validated route reversals & C1 \\
 E4 & Four interruption points in AppWorld & Duplicate effects and final state & C4 \\
 E5 & Ordered recorded network traces & Frontier by trace condition & C1--C2 robustness \\
-E6 & Optional cross-family model pair & Directional replication & Scope only \\
+E6 & Same-pair cross-benchmark transfer & Directional replication & Scope only \\
 E7 & Packet and controller scaling & Latency, bytes, memory & Systems overhead \\
 \bottomrule
 \end{tabular}
@@ -843,8 +843,8 @@ validation.
 \paragraph{Model and estimator dependence.}
 The primary same-family model pair controls some prompt-format variation but
 may favor transfer compatibility. The lightweight estimator can be
-miscalibrated under distribution shift. An optional cross-family replication
-tests directionality, yet does not establish universality. Test labels remain
+miscalibrated under distribution shift. A same-pair cross-benchmark replication
+tests directionality across workloads, yet does not establish universality. Test labels remain
 unavailable to the router, so calibration failures cannot be repaired after
 test evaluation.
 

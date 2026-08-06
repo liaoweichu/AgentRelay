@@ -61,15 +61,16 @@ All tasks are real, public benchmark data. No task is invented, paraphrased, or 
 
 ### 3.1 Main open-model pair
 
-- Edge executor: `Qwen/Qwen2.5-1.5B-Instruct`, BF16 when memory permits.
-- Cloud-equivalent executor: a pinned official `Qwen2.5-14B-Instruct` AWQ/GPTQ revision.
-- Rationale: same-family tokenization reduces an avoidable confound while preserving a meaningful capacity gap; both fit a 24 GB 4090D for single-GPU native inference.
+- Edge executor: `google/gemma-4-E4B-it` at an immutable revision.
+- Cloud-equivalent executor: `google/gemma-4-12b-it` at an immutable revision, using the declared memory-safe loading precision.
+- Both use the same official chat template policy, thinking mode, token budget, greedy decoding, and seed. The config validator rejects any other formal model identity or unpaired decoding control.
+- Rationale: the same Gemma 4 family reduces prompt/tokenizer confounds while preserving a measured capability gap; fixed endpoints run sequentially on a 24 GB 4090D.
 
-### 3.2 Cross-family generalization pair
+### 3.2 Cross-benchmark generalization
 
-- Edge executor: `meta-llama/Llama-3.2-3B-Instruct`.
-- Cloud-equivalent executor: `meta-llama/Llama-3.1-8B-Instruct` in a pinned memory-safe precision.
-- Run after the main pair and only if the full main protocol fits the formal budget.
+- Keep the same frozen Gemma 4 E4B/12B pair.
+- Test transfer across benchmark domains and difficulty bands rather than changing model families.
+- Run after the primary benchmark and only if the full main protocol fits the formal budget.
 
 ### 3.3 Generation controls
 
@@ -212,11 +213,11 @@ Report warm and cold model-loading cases separately. Main routing uses warm serv
 - Test whether the policy adapts payload choice without changing benchmark data.
 - Supports C1/C3; not a substitute for native inference.
 
-### E6. Cross-Model Generalization
+### E6. Cross-Benchmark Generalization
 
 - Freeze packet schema and policy form.
-- Refit only calibration parameters for the cross-family pair using official train split.
-- Evaluate ALFWorld seen/unseen first; expand only if budget permits.
+- Keep the frozen Gemma 4 E4B/12B pair and refit only authorized router/calibration parameters on the target benchmark's official train/dev splits.
+- Evaluate a second admitted benchmark first; expand only if its paired capability gate passes and budget permits.
 - Supports C2/C3 scope and generalization.
 
 ### E7. Microbenchmarks And Scaling
@@ -253,7 +254,7 @@ Report warm and cold model-loading cases separately. Main routing uses warm serv
 - missing dependency predecessor or provenance span;
 - one, two, and capped three patch rounds;
 - low-bandwidth and burst-loss segments from real traces;
-- same-family and cross-family tokenizers;
+- the same frozen Gemma 4 pair across benchmark-specific prompt/tool schemas;
 - read-only, reversible, irreversible, and unknown tool classes;
 - prepared, sent, acknowledged, committed, and indeterminate effect frontiers;
 - small-model schema-format failures;
@@ -285,7 +286,7 @@ Every failure category reports denominator and selection rule; examples are chos
 | P1 | E1 WebShop/AppWorld full | C1-C4 | high | benchmark adapters | main | protocol cannot remain identical across baselines |
 | P1 | E3 routing reversal | C1 | medium | main run traces | main | no validated decision reversal occurs |
 | P2 | E5 real-network traces | C1/C3 robustness | medium | payload logs | appendix/main figure | trace provenance cannot be pinned |
-| P2 | E6 second model pair | generalization | high | main pair complete | appendix | formal compute budget exhausted |
+| P2 | E6 same-pair cross-benchmark transfer | generalization | high | primary benchmark complete | appendix | target benchmark capability gate fails or formal compute budget is exhausted |
 | P2 | E7 scaling | systems evidence | low-medium | runtime complete | main/appendix | none |
 
 ## 11. No-Fabrication Status

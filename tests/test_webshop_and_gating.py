@@ -19,7 +19,7 @@ from agentrelay.formal_matrix import (
     task_artifact_scope,
     write_task_manifest,
 )
-from agentrelay.config import StorageLayout
+from agentrelay.config import GEMMA4_FORMAL_MODEL_PAIR, StorageLayout
 from agentrelay.gating import evaluate_router_learnability, summarize_paired_endpoints
 from agentrelay.learning import FEATURE_NAMES, JointRouterEstimator
 from agentrelay.official_adapters import WebShopAdapter
@@ -83,6 +83,7 @@ def endpoint_episode(
         "code_revision": "e" * 40,
         "config_hash": "2" * 64,
         "profile_hash": "3" * 64,
+        "model_ids": dict(GEMMA4_FORMAL_MODEL_PAIR),
         "model_revisions": {"edge": "f" * 40, "cloud": "1" * 40},
         "task_manifest_hash": sha256_json([split, "tasks"]),
     }
@@ -110,8 +111,14 @@ class WebShopSplitTests(unittest.TestCase):
             runner = object.__new__(FormalMatrixRunner)
             runner.config = {
                 "models": {
-                    "edge": {"revision": "b" * 40},
-                    "cloud": {"revision": "c" * 40},
+                    "edge": {
+                        "model_id": GEMMA4_FORMAL_MODEL_PAIR["edge"],
+                        "revision": "b" * 40,
+                    },
+                    "cloud": {
+                        "model_id": GEMMA4_FORMAL_MODEL_PAIR["cloud"],
+                        "revision": "c" * 40,
+                    },
                 }
             }
             runner.task_manifest = task_manifest
@@ -131,6 +138,7 @@ class WebShopSplitTests(unittest.TestCase):
                 "code_revision": source_tree_revision(),
                 "config_hash": sha256_json(runner.config),
                 "profile_hash": runner.profile_hash,
+                "model_ids": dict(GEMMA4_FORMAL_MODEL_PAIR),
                 "model_revisions": {"edge": "b" * 40, "cloud": "c" * 40},
                 "methods": ["edge_only"],
                 "resident_executors": ["edge"],
@@ -606,6 +614,7 @@ class PairedGateTests(unittest.TestCase):
                     "code_revision": "b" * 40,
                     "config_hash": "e" * 64,
                     "profile_hash": "f" * 64,
+                    "model_ids": dict(GEMMA4_FORMAL_MODEL_PAIR),
                     "model_revisions": {"edge": "c" * 40, "cloud": "d" * 40},
                     "methods": [method],
                     "resident_executors": [role.value],
@@ -625,6 +634,7 @@ class PairedGateTests(unittest.TestCase):
                     "code_revision": "b" * 40,
                     "config_hash": "e" * 64,
                     "profile_hash": "f" * 64,
+                    "model_ids": dict(GEMMA4_FORMAL_MODEL_PAIR),
                     "model_revisions": {"edge": "c" * 40, "cloud": "d" * 40},
                     "methods": [method],
                     "resident_executors": [role.value],

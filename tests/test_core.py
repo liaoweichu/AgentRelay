@@ -13,7 +13,11 @@ import math
 from pathlib import Path
 import unittest
 
-from agentrelay.config import load_json_config, validate_experiment_config
+from agentrelay.config import (
+    GEMMA4_FORMAL_MODEL_PAIR,
+    load_json_config,
+    validate_experiment_config,
+)
 from agentrelay.cost import CostWeights, HandoffMeasurement, RecordedBandwidthTrace
 from agentrelay.effects import EffectLedger
 from agentrelay.inference import NativeGenerationConfig
@@ -474,6 +478,34 @@ class ConfigurationTests(unittest.TestCase):
         config["limits"]["sample_limit"] = 10
         with self.assertRaises(ValueError):
             validate_experiment_config(config, allow_unlocked=True)
+
+    def test_formal_template_uses_only_the_frozen_gemma4_pair(self) -> None:
+        config = load_json_config(PROJECT_ROOT / "configs" / "formal-autodl-4090d.template.json")
+        self.assertEqual(
+            {role: value["model_id"] for role, value in config["models"].items()},
+            GEMMA4_FORMAL_MODEL_PAIR,
+        )
+        validate_experiment_config(config, allow_unlocked=True)
+
+    def test_formal_config_rejects_a_non_gemma_model(self) -> None:
+        config = load_json_config(PROJECT_ROOT / "configs" / "formal-autodl-4090d.template.json")
+        config = json.loads(json.dumps(config))
+        config["models"]["edge"]["model_id"] = "Qwen/Qwen2.5-1.5B-Instruct"
+        with self.assertRaisesRegex(ValueError, "frozen Gemma 4 model"):
+            validate_experiment_config(config, allow_unlocked=True)
+
+    def test_formal_config_rejects_unpaired_decoding(self) -> None:
+        config = load_json_config(PROJECT_ROOT / "configs" / "formal-autodl-4090d.template.json")
+        config = json.loads(json.dumps(config))
+        config["models"]["cloud"]["enable_thinking"] = True
+        with self.assertRaisesRegex(ValueError, "decoding field"):
+            validate_experiment_config(config, allow_unlocked=True)
+
+    def test_legacy_local_config_is_not_executable(self) -> None:
+        config = load_json_config(PROJECT_ROOT / "configs" / "local-smoke.locked.json")
+        with self.assertRaisesRegex(ValueError, "edge and cloud model roles"):
+            validate_experiment_config(config)
+        validate_experiment_config(config, allow_legacy_local_models=True)
 
     def test_native_model_config_ignores_requested_revision_metadata(self) -> None:
         config = NativeGenerationConfig.from_dict(

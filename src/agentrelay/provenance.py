@@ -40,6 +40,7 @@ class RunManifest:
     dataset_revision: str
     split: str
     sample_ids: tuple[str, ...]
+    model_ids: Mapping[str, str]
     model_revisions: Mapping[str, str]
     seed: int
     prompt_hash: str
@@ -61,6 +62,7 @@ class RunManifest:
         dataset_revision: str,
         split: str,
         sample_ids: tuple[str, ...],
+        model_ids: Mapping[str, str],
         model_revisions: Mapping[str, str],
         seed: int,
         prompt: str,
@@ -76,6 +78,7 @@ class RunManifest:
             dataset_revision=dataset_revision,
             split=split,
             sample_ids=sample_ids,
+            model_ids=dict(model_ids),
             model_revisions=dict(model_revisions),
             seed=seed,
             prompt_hash=sha256_text(prompt),

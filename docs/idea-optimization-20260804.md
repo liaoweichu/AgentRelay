@@ -161,7 +161,7 @@ Direct routing baselines remain Hera-style and AgentRouter-style implementations
 
 ## 7. 4090D Feasibility
 
-- Serve the 1.5B edge and 7B/14B cloud-equivalent models sequentially on one 24 GB RTX 4090D if concurrent residency is unstable.
+- Serve the frozen Gemma 4 E4B edge and 12B cloud-equivalent models sequentially on one 24 GB RTX 4090D if concurrent residency is unstable.
 - Keep the controller lightweight: logistic/GBDT/small MLP plus calibration; no LLM-scale RL is required for the first formal result.
 - Start with ALFWorld dev for continuation closure/fidelity and AppWorld dev for effect-frontier behavior; add WebShop after both gates pass.
 - Use official train rollouts for fitting and official dev for calibration. Freeze all policies and thresholds before official test execution.
@@ -203,4 +203,3 @@ Proceed to the 4090D implementation phase only with the refined C1-C4 statements
 3. AppWorld exposes enough effect identity/state information for scoped failure-injection evaluation.
 
 If gate 1 fails, stop the four-contribution framing. If gate 2 fails, remove switch-aware routing as a primary contribution. If gate 3 fails, keep effect-frontier logic as scoped engineering and do not make it a headline claim.
-

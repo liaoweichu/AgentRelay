@@ -10,9 +10,15 @@ target_venue:
   status: "provisional"
 stage:
   current: "implementation"
-  gate: "webshop_train_dev_reward_router_gate_ready_for_autodl_4090d"
-  updated_at: "2026-08-05"
+  gate: "gemma4_pair_locked_before_train_dev_gate"
+  updated_at: "2026-08-06"
 constraints:
+  models:
+    edge: "google/gemma-4-E4B-it"
+    cloud: "google/gemma-4-12b-it"
+    exact_pair_required: true
+    immutable_revisions_required: true
+    paired_decoding_required: true
   datasets:
     public_only: true
     synthetic_tasks_prohibited: true
@@ -40,6 +46,10 @@ artifacts:
   experimental_rules: "docs/experimental-rules.md"
   novelty_map: "literature/literature-search-20260803-agentrelay/papers.md"
   adjacent_mechanism_map: "literature/literature-search-20260804-agentrelay-adjacent-mechanisms/papers.md"
+  gemma4_benchmark_selection: "literature/literature-search-20260806-gemma4-agentrelay-benchmarks/papers.md"
+  dataset_selection: "docs/dataset-selection-20260806.md"
+  model_pair_integrity_audit: "docs/model-pair-integrity-audit-20260806.md"
+  evidence_policy: "configs/evidence-policy.json"
   method_spec: "docs/method-spec.md"
   experiment_plan: "experiments/experiment-plan.md"
   implementation: "src/agentrelay/"
@@ -82,11 +92,11 @@ experiments:
   - id: "SW-CHECK"
     scope: "software_correctness_only"
     status: "passed"
-    result: "53 unit tests and source compilation passed; official WebShop split guards, loop recovery, task-level reward router, provenance-checked resumable train/dev gate, 12 routing methods, and 7 continuation codecs implemented; no paper result produced"
+    result: "57 unit tests and source compilation passed; exact Gemma 4 E4B/12B formal-pair guards, official WebShop split guards, loop recovery, task-level reward router, provenance-checked resumable train/dev gate, 12 routing methods, and 7 continuation codecs implemented; no paper result produced"
   - id: "E0"
-    scope: "local_diagnostic"
-    status: "passed_non_evidence"
-    result: "One native Qwen2.5-1.5B inference on public AgentProcessBench bfcl/test input prefix passed protocol and integrity checks on RTX 4080 Laptop after the WebShop/router changes; peak CUDA memory 9,908,711,424 bytes; paper_evidence=false"
+    scope: "historical_local_diagnostic"
+    status: "excluded_non_gemma_non_evidence"
+    result: "A legacy non-Gemma native inference passed software/provenance checks on RTX 4080 Laptop; it is retained for regression only and excluded from all model, method, and paper evidence"
   - id: "WS-GATE-50"
     scope: "diagnostic_only_invalid_legacy_split"
     status: "audited_non_evidence"
@@ -94,7 +104,7 @@ experiments:
   - id: "WS-ROUTER-GATE"
     scope: "official_train_dev_learnability"
     status: "ready_for_autodl_4090d"
-    result: "One-command resumable code and predeclared checks ready for 200 paired official-train and 100 paired official-dev tasks; fixed endpoints run in separate single-model processes; endpoint code/config/profile/model/manifest provenance is enforced; official test remains blocked"
+    result: "One-command resumable code and predeclared checks ready for 200 paired official-train and 100 paired official-dev tasks with frozen Gemma 4 E4B/12B identities; fixed endpoints run in separate single-model processes; endpoint code/config/profile/model/manifest provenance is enforced; official test remains blocked"
   - id: "E1-E7"
     scope: "formal_autodl"
     status: "blocked_until_webshop_train_dev_gate_passes"

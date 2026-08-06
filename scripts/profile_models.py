@@ -15,7 +15,12 @@ import time
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(PROJECT_ROOT / "src"))
 
-from agentrelay.config import StorageLayout, load_json_config, validate_experiment_config  # noqa: E402
+from agentrelay.config import (  # noqa: E402
+    StorageLayout,
+    load_json_config,
+    validate_experiment_config,
+    validate_gemma4_model_pair,
+)
 from agentrelay.continuation import render_semantic_continuation  # noqa: E402
 from agentrelay.cost import RecordedBandwidthTrace  # noqa: E402
 from agentrelay.datasets import DatasetSpec, load_public_dataset  # noqa: E402
@@ -45,6 +50,7 @@ def main() -> int:
     config_path = Path(args.config).resolve()
     config = load_json_config(config_path)
     validate_experiment_config(config)
+    validate_gemma4_model_pair(config["models"])
     storage = StorageLayout(Path(config["data_root"]).resolve())
     dataset_config = config["datasets"][0]
     spec = DatasetSpec(
@@ -148,4 +154,3 @@ def main() -> int:
 
 if __name__ == "__main__":
     raise SystemExit(main())
-

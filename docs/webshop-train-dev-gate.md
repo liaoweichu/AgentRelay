@@ -5,8 +5,10 @@ goal order is fixed as test `0..499`, dev `500..1499`, and train `1500..12086`.
 The diagnostic samples below are drawn only inside train and dev.
 
 Run on the AutoDL 4090D from `/root/autodl-tmp/AgentRelay` after pulling the
-current commit. Use the locked Gemma 4 configuration and measured service
-profile already present on the instance.
+current commit. The locked configuration must identify edge
+`google/gemma-4-E4B-it` and cloud `google/gemma-4-12b-it` at immutable
+revisions. Regenerate the measured service profile after this lock; an older
+profile or a mutable `master` snapshot is rejected.
 
 ## Recommended one-command run
 
@@ -24,6 +26,10 @@ python scripts/run_webshop_train_dev_gate.py \
   --revision 64fa2a5c15c7daa698b9ac93f5bb5437b634c9bd \
   --output-dir /root/autodl-tmp/AgentRelay/results/webshop-train-dev-gate
 ```
+
+Before this command, run `python scripts/audit_model_pair.py`. The orchestrator
+also validates the locked config, and every new endpoint manifest records both
+`model_ids` and immutable `model_revisions`.
 
 An exit status of `0` means that the predeclared gate passed. Status `2` means
 that the gate result was written but failed; do not run the official test.

@@ -128,7 +128,7 @@ class ObservableOfficialAdapter(PublicBenchmarkAdapter):
                     },
                     world_version=observation.observation_version,
                     trace_ref=span,
-                    provenance_hash=sha256_json({"action": action, "observation": text}),
+                    provenance_hash=sha256_text(text),
                 )
             )
         nodes, edges, obligations = build_standard_semantic_graph(

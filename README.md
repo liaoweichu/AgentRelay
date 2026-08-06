@@ -7,8 +7,9 @@ CCFA-managed research project for a step-criticality-aware edge-cloud handoff ru
 - Stage: implementation and software verification
 - Active gate: WebShop official-train/dev reward-router learnability on AutoDL RTX 4090D
 - Provisional venue: MLSys 2027, with TSC as a possible extension/fallback
-- Local verification: RTX 4080 Laptop, small-batch debugging only
+- Local verification: software-only on RTX 4080 Laptop; no Gemma model inference
 - Formal experiments: AutoDL RTX 4090D (24 GB)
+- Frozen model pair: edge `google/gemma-4-E4B-it`; cloud `google/gemma-4-12b-it`
 - Dataset policy: real public datasets and official splits only
 - Storage on AutoDL: `/root/autodl-tmp/AgentRelay`
 
@@ -17,19 +18,22 @@ only use declared public train/development splits. The local diagnostic reads
 one public AgentProcessBench `bfcl/test` input prefix after dropping all label
 columns; it is never used for tuning, model selection, or manuscript tables.
 
-## Verified local gate
+## Historical local diagnostic
 
 - GPU: NVIDIA GeForce RTX 4080 Laptop GPU
-- Native model: `Qwen/Qwen2.5-1.5B-Instruct@989aa798...aa306`
+- Native model: legacy non-Gemma checkpoint, retained only for software/provenance regression
 - Public data: `LulaCola/AgentProcessBench/bfcl@test@cd81f326...a98bf`
 - Result: 1/1 nonempty native generation; semantic protocol v2, obligation
   closure, named predecessor patch, effect frontier, and trace provenance valid
-- Software: 53 tests pass; 12 routing methods and 7 continuation codecs implemented
-- Independent audit: all 14 checks passed; `paper_evidence=false`
+- Evidence status: excluded by `configs/evidence-policy.json`; it cannot support a model or method claim
+- Software: 12 routing methods and 7 continuation codecs implemented
+- Independent artifact audit remains valid without current-source matching; `paper_evidence=false`
 - Peak CUDA memory: 9,908,711,424 bytes; generation latency: 8,791.74 ms
 - Run: `artifacts/local-data/runs/local-smoke-20260805T091401934426Z-1a137502`
 
-The next action requires an AutoDL RTX 4090D instance. Run the resumable,
+Before the next AutoDL run, lock the active template and run
+`python scripts/audit_model_pair.py`; both commands fail unless the exact Gemma
+4 E4B/12B identities and paired decoding controls are present. Then run the resumable,
 one-command paired WebShop train/dev gate in `docs/webshop-train-dev-gate.md`.
 Endpoint code/config/profile/model/manifest provenance is checked before
 fitting; the official test split remains blocked until that gate passes.

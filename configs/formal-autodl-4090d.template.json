@@ -6,18 +6,22 @@
   "hardware": "AutoDL RTX 4090D (24 GB)",
   "models": {
     "edge": {
-      "model_id": "Qwen/Qwen2.5-1.5B-Instruct",
+      "model_id": "google/gemma-4-E4B-it",
       "requested_revision": "main",
       "revision": "UNLOCKED",
       "dtype": "bfloat16",
       "quantization": "none",
       "device_map": "auto",
-      "max_new_tokens": 512,
+      "max_new_tokens": 1024,
       "do_sample": false,
+      "temperature": 1.0,
+      "top_p": 1.0,
+      "architecture": "multimodal_lm",
+      "enable_thinking": false,
       "seed": 0
     },
     "cloud": {
-      "model_id": "Qwen/Qwen2.5-14B-Instruct",
+      "model_id": "google/gemma-4-12b-it",
       "requested_revision": "main",
       "revision": "UNLOCKED",
       "dtype": "bfloat16",
@@ -25,6 +29,10 @@
       "device_map": "auto",
       "max_new_tokens": 1024,
       "do_sample": false,
+      "temperature": 1.0,
+      "top_p": 1.0,
+      "architecture": "multimodal_lm",
+      "enable_thinking": false,
       "seed": 0
     }
   },

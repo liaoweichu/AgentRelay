@@ -353,6 +353,10 @@ class FormalMatrixRunner:
             "code_revision": code_revision,
             "config_hash": sha256_json(self.config),
             "profile_hash": self.profile_hash,
+            "model_ids": {
+                role: str(value["model_id"])
+                for role, value in self.config["models"].items()
+            },
             "model_revisions": {
                 role: str(value["revision"])
                 for role, value in self.config["models"].items()
@@ -507,6 +511,10 @@ class FormalMatrixRunner:
             "code_revision": code_revision,
             "config_hash": context["config_hash"],
             "profile_hash": self.profile_hash,
+            "model_ids": {
+                role: str(value["model_id"])
+                for role, value in self.config["models"].items()
+            },
             "model_revisions": {
                 role: str(value["revision"])
                 for role, value in self.config["models"].items()

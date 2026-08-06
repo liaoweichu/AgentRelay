@@ -74,7 +74,7 @@ These are hypotheses, not results.
 1. **Continuation-tax gate:** switch cost must either change at least 10% of candidate decisions or expose a repeatable phase boundary in at least two benchmark/model-network settings. Otherwise narrow the project to verified state continuity rather than switch-aware routing.
 2. **Closure/fidelity gate:** the obligation-closed packet plus patch must outperform a size-matched narrative summary or typed delta without dependency closure in invariant recovery and downstream continuation on public validation data. Otherwise stop the four-contribution framing.
 3. **Reliability gate:** the benchmark adapter must expose deterministic mutation identifiers or state diffs. If not, C4 is evaluated only where official sandbox state supports it and stated as scoped.
-4. **Compute gate:** a complete pilot pair must run within 24 GB on the 4090D with reproducible configurations. If 14B plus edge model is unstable, execute models sequentially and report measured cold/warm handoff separately.
+4. **Compute gate:** the frozen `google/gemma-4-E4B-it` / `google/gemma-4-12b-it` pilot pair must run within 24 GB on the 4090D with reproducible configurations. Execute the models sequentially when co-residency is unstable and report measured cold/warm handoff separately; do not substitute another model.
 
 ## Non-Goals
 
@@ -90,4 +90,3 @@ These are hypotheses, not results.
 ## Experimental Integrity Boundary
 
 Only official public benchmark tasks and official splits are used. Native inference over the official training split may produce execution traces and routing labels; those traces are recorded run artifacts and never replace or alter the underlying tasks. All formal main-paper numbers originate from AutoDL RTX 4090D runs and immutable result files.
-

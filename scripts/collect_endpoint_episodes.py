@@ -13,6 +13,7 @@ PROJECT_ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(PROJECT_ROOT / "src"))
 
 from agentrelay.router_data import pair_endpoint_episodes  # noqa: E402
+from agentrelay.config import GEMMA4_FORMAL_MODEL_PAIR  # noqa: E402
 from agentrelay.schema import canonical_json, sha256_json  # noqa: E402
 
 
@@ -54,6 +55,7 @@ def main() -> int:
             "code_revision",
             "config_hash",
             "profile_hash",
+            "model_ids",
             "model_revisions",
             "methods",
             "resident_executors",
@@ -80,6 +82,10 @@ def main() -> int:
             raise ValueError(
                 "train/dev endpoint runs must be marked paper_evidence=false"
             )
+        if manifest.get("model_ids") != GEMMA4_FORMAL_MODEL_PAIR:
+            raise ValueError(
+                f"endpoint run does not use the frozen Gemma 4 model pair: {root}"
+            )
         manifests.append(manifest)
         for item in manifest.get("results", ()):
             if str(item.get("method")) != method:
@@ -103,6 +109,7 @@ def main() -> int:
                 "code_revision": str(manifest.get("code_revision", "")),
                 "config_hash": str(manifest.get("config_hash", "")),
                 "profile_hash": str(manifest.get("profile_hash", "")),
+                "model_ids": dict(manifest.get("model_ids", {})),
                 "model_revisions": dict(manifest.get("model_revisions", {})),
                 "task_manifest_hash": str(manifest.get("task_manifest_hash", "")),
             }
@@ -118,6 +125,7 @@ def main() -> int:
         "code_revision",
         "config_hash",
         "profile_hash",
+        "model_ids",
         "model_revisions",
     )
     for field in common_fields:

@@ -65,6 +65,7 @@ def _local_smoke(args: argparse.Namespace) -> int:
         args.config,
         limit=args.limit,
         subset=args.subset,
+        model_role=args.model_role,
         command=tuple(sys.argv),
         required_gpu_name=args.required_gpu_name,
     )
@@ -125,6 +126,7 @@ def build_parser() -> argparse.ArgumentParser:
     local_smoke.add_argument("config", help="locked local-smoke JSON config")
     local_smoke.add_argument("--limit", type=int, default=1)
     local_smoke.add_argument("--subset")
+    local_smoke.add_argument("--model-role", choices=("edge", "cloud"), default="edge")
     local_smoke.add_argument("--required-gpu-name", default="4080")
     local_smoke.set_defaults(func=_local_smoke)
 

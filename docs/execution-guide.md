@@ -13,49 +13,19 @@ python -m compileall -q src scripts tests
 python scripts/export_method_manifest.py \
   artifacts/local-data/results/implemented-methods-v2.json
 python -m agentrelay.cli check-config configs/local-smoke.template.json --allow-unlocked
+python scripts/audit_model_pair.py
 ```
 
 These tests use minimal program fixtures only. They test serialization,
 transactions, routing arithmetic, and statistics; they are not benchmark data
 and are never included in paper tables.
 
-## Tier 1: RTX 4080 Laptop diagnostic probe
+## Tier 1: Local Model Probe Skipped
 
-1. Install the `smoke` extra in a dedicated virtual environment, then replace
-   any CPU PyTorch build with the official CUDA 12.8 wheel:
-
-```powershell
-py -3.12 -m venv .venv
-.\.venv\Scripts\python.exe -m pip install -e ".[smoke]"
-.\.venv\Scripts\python.exe -m pip install --force-reinstall --no-deps `
-  torch==2.11.0 --index-url https://download.pytorch.org/whl/cu128
-```
-
-2. Resolve mutable references into a locked local config:
-
-```powershell
-python scripts/lock_config.py `
-  configs/local-smoke.template.json `
-  configs/local-smoke.locked.json
-python scripts/download_public_data.py configs/local-smoke.locked.json
-python scripts/preflight.py configs/local-smoke.locked.json
-python -m agentrelay.cli local-smoke `
-  configs/local-smoke.locked.json --limit 1 --required-gpu-name 4080
-python -m agentrelay.cli verify-run `
-  artifacts/local-data/runs/<run-id> `
-  --required-gpu-name 4080 --require-diagnostic-only --project-root .
-```
-
-When all assets are already cached, set `HF_HUB_OFFLINE=1`,
-`TRANSFORMERS_OFFLINE=1`, and `HF_DATASETS_OFFLINE=1` to prevent metadata
-network checks from obscuring an otherwise reproducible offline run.
-
-Only the public AgentProcessBench `bfcl/test` input prefix and native
-`Qwen2.5-1.5B-Instruct` inference are permitted in this tier. The adapter drops
-`ground_truth`, `answer_text`, `step_labels`, `final_label`, and every other
-non-allowlisted column before row iteration. Keep the one-row certified probe
-and never exceed the configured eight-row debugging ceiling. Outputs must be
-stamped `paper_evidence=false` and cannot populate manuscript result tables.
+The local machine does not contain the Gemma 4 E4B/12B checkpoints and is not
+authorized to download or run them. Local work stops after Tier 0 software and
+model-policy checks. The first native Gemma smoke is G6 on the AutoDL 4090D,
+using `docs/cloud-4090d-handoff-plan-20260806.md`.
 
 ## Tier 2: AutoDL RTX 4090D formal runs
 
@@ -80,6 +50,11 @@ bash scripts/prepare_official_benchmarks.sh
 The locked configuration records exact model, dataset, and official repository
 commits. All datasets, models, native traces, checkpoints, logs, and results stay
 under `/root/autodl-tmp/AgentRelay`.
+
+The only admissible formal identities are `google/gemma-4-E4B-it` for `edge`
+and `google/gemma-4-12b-it` for `cloud`. The config validator, service-profile
+check, run-context hash, endpoint collector, and router gate all enforce this
+pair. A mutable `master` snapshot path is not an immutable model revision.
 
 The official adapters and common matrix runner are implemented. Before any
 full evaluation, profile both pinned models on the 4090D and provide a real
@@ -137,7 +112,7 @@ Run the experiment gates in this order:
 4. Freeze schema, prompts, thresholds, and router configuration.
 5. E1/E3 full official evaluation and routing-reversal analysis.
 6. E5 real recorded network trace replay.
-7. E6 cross-family generalization only if the declared budget remains.
+7. E6 cross-benchmark generalization with the same Gemma 4 pair if budget remains.
 
 Do not inspect test evaluator internals or alter prompts, selection thresholds,
 or task order after a formal test run. Any interrupted run is retained with its
