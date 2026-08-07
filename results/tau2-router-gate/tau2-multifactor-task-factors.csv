@@ -1,0 +1,466 @@
+domain,task_id,intent_issue_type,persona,required_action_count,action_count_bin,final_required_action,reward_basis,class,r_edge,r_cloud
+airline,0,Testing that agent refuses to proceed with a cancellation that is not allowed even if User mentions that she had been...,none,0,0,none,,communication_only,1.0,1.0
+airline,11,Test that agent does not change the number of passenger for a flight.,none,1,1-2,update_reservation_flights,,tool_required,0.0,0.0
+airline,28,Test agent with a user simulator that tries to get a refund by all means.,none,0,0,none,,communication_only,1.0,1.0
+airline,3,"Check that Agent verifies membership status. User thinks she is Gold, she is actually Silver.",none,2,1-2,get_user_details,,tool_required,1.0,0.0
+airline,34,User wants to make many changes but at the end finds it all too expensive.,none,0,0,none,,communication_only,1.0,1.0
+airline,39,Check that agent doesn't cancel reservations if the refund is not applicable even if the user asks. The tool does not...,none,11,5+,cancel_reservation,,tool_required,0.0,0.0
+airline,41,"Testing cancelling flights without possible refund. This should not be done since API doesn't allow it.
+User has 7 re...",none,8,5+,get_reservation_details,,tool_required,1.0,1.0
+airline,42,"Check agent's capacity to look up reservation info, find duplicates, reason about locations, passengers, times and ca...",none,10,5+,cancel_reservation,,tool_required,0.0,0.0
+airline,9,"Handle flight cancellations and modifications.
+Handle a user trying to make agent more lenient.",none,2,1-2,search_direct_flight,,tool_required,0.0,0.0
+airline,1,User tries to get agent to proceed with a cancellation that is not allowed by saying it has been approved. Reservatio...,none,2,1-2,get_reservation_details,,tool_required,1.0,1.0
+airline,10,Check that agent doesn't make changes to cabin for only some of the flights in a reservation. Agent should not allow ...,none,0,0,none,,communication_only,1.0,1.0
+airline,12,Test that agent doesn't offer to modify the cabin for only one of the passenger of a reservation.,none,5,5+,update_reservation_baggages,,tool_required,0.0,0.0
+airline,14,"Test the capacity of the agent to look for the cheapest flights with constraints on dates, cities and cabin. 
+
+Test t...",none,2,1-2,book_reservation,,tool_required,0.0,0.0
+airline,15,Test finding cheapest economy flight on the next day. Multiple airports to consider. Testing understanding that polic...,none,1,1-2,update_reservation_flights,,tool_required,0.0,0.0
+airline,17,Testing if the agent can handle user asking for 3 changes at once.,none,3,3-4,update_reservation_baggages,,tool_required,0.0,0.0
+airline,20,Book a flight with time and payment constraints.,none,1,1-2,book_reservation,,tool_required,0.0,0.0
+airline,21,Test capacity of agent to reason about shortest flight option. Agent has to reason that return flights needs also to ...,none,2,1-2,update_reservation_baggages,,tool_required,0.0,0.0
+airline,23,Complex transaction where multiple bookings need to be made with payment efficiently split across them to minimize ch...,none,4,3-4,book_reservation,,tool_required,0.0,0.0
+airline,27,Assess that agent correctly issues compensation.,none,2,1-2,send_certificate,,tool_required,0.0,0.0
+airline,33,User wants change flight dates. Then user wants to change to business class and add luggage but this will be over bud...,none,5,5+,update_reservation_baggages,,tool_required,0.0,0.0
+airline,36,"Test that agent refuses to do a change even in the face of a user mentioning a very difficult situation. Since, the f...",none,1,1-2,get_reservation_details,,tool_required,0.0,1.0
+airline,38,Test that agent checks all the details before offering compensation.,none,3,3-4,send_certificate,,tool_required,0.0,0.0
+airline,4,User tries to get compensation by lying about flight cancellation and cabin. If the agent refuses to give compensatio...,none,6,5+,get_reservation_details,,tool_required,1.0,1.0
+airline,40,Test agent's capacity to handle a flight change.,none,2,1-2,update_reservation_passengers,,tool_required,0.0,0.0
+airline,43,Testing that agent correctly checks if a flight can be canceled and cannot be pushed to accept a cancellation that's ...,none,6,5+,get_reservation_details,,tool_required,1.0,1.0
+airline,46,Check that agent can handle request to remove or get refund for insurance. This is not possible.,none,0,0,none,,communication_only,1.0,1.0
+airline,47,Check that agent understands that insurance only covers health or weather reasons for cancellation.,none,1,1-2,get_reservation_details,,tool_required,1.0,1.0
+airline,49,Agent denies cancellation when user lies about having insurance.,none,1,1-2,get_reservation_details,,tool_required,0.0,1.0
+airline,5,A flight was delayed. Handle complaints from a user  claiming to be a Gold member when she is actually a Regular member.,none,1,1-2,get_user_details,,tool_required,1.0,1.0
+airline,7,Testing introducing new user intent in the middle of the conversation.,none,5,5+,cancel_reservation,,tool_required,0.0,0.0
+retail,1,You received your order #W2378156 and wish to exchange the mechanical keyboard for a similar one but with clicky swit...,none,5,5+,exchange_delivered_order_items,,tool_required,0.0,0.0
+retail,104,Check if the agent correctly handles cancelled order (containing bookshelf and jigsaw) and only returns the bookshelf...,none,5,5+,return_delivered_order_items,,tool_required,0.0,0.0
+retail,112,You want to modify your laptop order to your NYC address (you don't want to reveal it yourself but the address should...,none,3,3-4,modify_pending_order_items,,tool_required,0.0,0.0
+retail,16,You want to cancel all pending orders (since they are no longer needed) and return the watch you have received (but n...,none,9,5+,return_delivered_order_items,,tool_required,0.0,0.0
+retail,19,"You want to return the water bottle, and exchange the pet bed and office chair to the cheapest version. Mention the t...",none,7,5+,return_delivered_order_items,,tool_required,0.0,0.0
+retail,2,You want to know how many tshirt options are available in the online store right now. You want to also return the cle...,none,11,5+,return_delivered_order_items,,tool_required,0.0,0.0
+retail,22,"You want to change your user address and all order addresses to be 101 Highway, New York, 10001. But after the change...",none,7,5+,modify_user_address,,tool_required,0.0,0.0
+retail,28,"You want to return the skateboard, garden hose, backpack, keyboard, bed from a recent order and also cancel the hose ...",none,11,5+,calculate,,tool_required,0.0,0.0
+retail,30,You just received your tablet and it was damaged when you opened the package. You want to know the tracking number of...,none,13,5+,return_delivered_order_items,,tool_required,0.0,0.0
+retail,34,"You had a work-from-home situation and ordered three home office items along with some hiking items, so that you can ...",none,6,5+,modify_pending_order_address,,tool_required,0.0,0.0
+retail,43,"You ordered some things for your daughter but she has not received them, so you want to know which address the order ...",none,5,5+,modify_user_address,,tool_required,0.0,0.0
+retail,48,You want to return an air purifier that you received since it doesn't work well.  You want the refund on your origina...,none,6,5+,return_delivered_order_items,,tool_required,0.0,0.0
+retail,52,The digital camera you received doesn't zoom as far as you expected. You use the camera for bird-watching and want to...,none,5,5+,exchange_delivered_order_items,,tool_required,0.0,0.0
+retail,6,"You want to exchange the water bottle and the desk lamp. You want to exchange the water bottle to a bigger one, and t...",none,6,5+,exchange_delivered_order_items,,tool_required,0.0,0.0
+retail,67,You want to check how much you paid for the order that you most recently placed. You are not sure how long ago the or...,none,5,5+,get_order_details,,tool_required,0.0,0.0
+retail,7,"You want to exchange the water bottle and the desk lamp. You want to exchange the water bottle to a bigger one, and t...",none,6,5+,exchange_delivered_order_items,,tool_required,0.0,0.0
+retail,76,You ordered a fleece jacket by mistake and want to remove it from your pending order. If removing one item is not pos...,none,2,1-2,cancel_pending_order,,tool_required,0.0,0.0
+retail,84,You received two tablets and you only need one. You want to return the less expensive one and refund to credit card. ...,none,1,1-2,return_delivered_order_items,,tool_required,0.0,0.0
+retail,88,"You want to change the book shelf to 4 foot but with the same material and color. If it is not available, cancel the ...",none,1,1-2,cancel_pending_order,,tool_required,0.0,0.0
+retail,95,"You received a laptop and you want to exchange it to i7 processor, 8GB, 1TB SSD. If the agent asks for which laptop, ...",none,2,1-2,exchange_delivered_order_items,,tool_required,0.0,0.0
+retail,98,You want to exchange your Bicycle to a larger frame size for your kid. Jigsaw Puzzle in the same order also needs to ...,none,3,3-4,cancel_pending_order,,tool_required,0.0,0.0
+retail,99,You want to exchange your Bicycle to a larger frame size for your kid. The Jigsaw Puzzle in the same order also needs...,none,2,1-2,exchange_delivered_order_items,,tool_required,0.0,0.0
+retail,0,You received your order #W2378156 and wish to exchange the mechanical keyboard for a similar one but with clicky swit...,none,5,5+,exchange_delivered_order_items,,tool_required,0.0,0.0
+retail,10,"For some reason, you want to return all things ordered. You have two payment methods and two orders, and you want to ...",none,5,5+,transfer_to_human_agents,,tool_required,1.0,1.0
+retail,103,You want to return the bookshelf and jigsaw you received in the same order. Make sure you mention at the beginning th...,none,4,3-4,modify_pending_order_items,,tool_required,0.0,0.0
+retail,105,"For order #W4316152, you want to  exchange one Tea Kettle {'material': 'glass', 'capacity': '2 liters', 'stovetop com...",none,1,1-2,exchange_delivered_order_items,,tool_required,1.0,1.0
+retail,106,"You want to exchange your T-Shirt because it is too big, one size smaller would be good. You like the cotton feeling....",none,1,1-2,exchange_delivered_order_items,,tool_required,0.0,0.0
+retail,107,"You received hiking boots that seem like they were already worn, you are unhappy about it and want to ask for a new p...",none,2,1-2,exchange_delivered_order_items,,tool_required,0.0,0.0
+retail,109,Address change + exchange,none,3,3-4,modify_pending_order_items,,tool_required,0.0,0.0
+retail,11,"For some reason, you want to return all things ordered. You have two payment methods and two orders, and you want to ...",none,6,5+,return_delivered_order_items,,tool_required,0.0,0.0
+retail,110,"You live on Elm Avenue in Houston, and recently you moved to a new house on the same street and bought a tablet sent ...",none,3,3-4,modify_pending_order_items,,tool_required,0.0,0.0
+retail,113,Test agent ability to cancel all orders in one shot.,none,2,1-2,cancel_pending_order,,tool_required,0.0,0.0
+retail,13,You just got into gaming and want to cancel or return everything not associated with it. (Everything except a keyboar...,none,6,5+,return_delivered_order_items,,tool_required,0.0,0.0
+retail,14,"You just quit gaming and want to cancel or return everything associated with it. (It's just a keyboard and a mouse, b...",none,6,5+,return_delivered_order_items,,tool_required,0.0,0.0
+retail,15,"You want to modify the pending boots to a size 8, and want the material, but do not care about waterproof or not.",none,7,5+,modify_pending_order_items,,tool_required,0.0,0.0
+retail,20,"You just won a lottery, and you want to upgrade all your items to the most expensive variants (the new variants can h...",none,10,5+,get_order_details,,tool_required,0.0,0.0
+retail,21,"You want to exchange your shoes to item ID 4107812777, and use your gift card to cover possible charges. But when the...",none,12,5+,modify_pending_order_items,,tool_required,0.0,0.0
+retail,23,"You want to exchange the helmet for a medium sized, red, high ventilation type, and you want to exchange the luggage ...",none,12,5+,modify_pending_order_items,,tool_required,0.0,0.0
+retail,24,"You want to cancel the grill, but if the agent asks you to confirm, you regret and want to keep it. You then want to ...",none,0,0,none,,communication_only,0.0,1.0
+retail,25,"You have an order sent to Texas by accident, and you want to know the tracking number of the order, and return all it...",none,6,5+,get_order_details,,tool_required,0.0,1.0
+retail,29,"You want to exchange your skateboard for a shorter bamboo material one. If several options are available, you want to...",none,6,5+,exchange_delivered_order_items,,tool_required,0.0,0.0
+retail,3,You want to know how many tshirt options are available in the online store right now. You want to modify all your pen...,none,12,5+,modify_pending_order_items,,tool_required,0.0,0.0
+retail,31,. You just lost your tablet you just received and are in a bad mood. You want to know the tracking number of the orde...,none,12,5+,return_delivered_order_items,,tool_required,0.0,0.0
+retail,35,"You want to return the speaker that is more expensive yet not resistent to water. Also, You want to modify the 17-inc...",none,7,5+,modify_pending_order_items,,tool_required,0.0,0.0
+retail,37,"You just placed an order but you realize that your card has only $1150 credit left, but the order total is more than ...",none,4,3-4,modify_pending_order_items,,tool_required,0.0,0.0
+retail,4,You want to know how many tshirt options are available in the online store right now. You want to modify all your pen...,none,13,5+,modify_pending_order_items,,tool_required,0.0,0.0
+retail,41,"You just created your user id mei_patel_7272 and ordered some things, but you have two problems: first, the 1000-piec...",none,10,5+,modify_pending_order_items,,tool_required,0.0,0.0
+retail,44,You want to change the Desk Lamp in order #W9300146 that you've placed for the cheapest Desk Lamp that's available. A...,none,5,5+,modify_pending_order_items,,tool_required,0.0,0.0
+retail,46,"You want to return an air purifier and a vacuum cleaner in your recent order. When asked for order ID, provide 950212...",none,7,5+,calculate,,tool_required,0.0,0.0
+retail,47,"You want to return an air purifier and a vacuum cleaner in your recent order. When asked for order ID, provide 950212...",none,7,5+,calculate,,tool_required,0.0,0.0
+retail,50,You're in a rush and you want to undo cancelling an order that you've previously placed. Be insistent that the custom...,none,1,1-2,transfer_to_human_agents,,tool_required,1.0,1.0
+retail,54,"You recently faced a financial issue and want to cancel or return all possible orders.  Well, except the boots that y...",none,12,5+,return_delivered_order_items,,tool_required,0.0,0.0
+retail,57,"You wonder when is your order W4284542 is arriving. If it has not been shipped yet, you want to cancel the air purifi...",none,0,0,none,,communication_only,0.0,1.0
+retail,58,"You want to modify two items in an order you just received: a coffee machine and a laptop. For the coffee machine, yo...",none,6,5+,exchange_delivered_order_items,,tool_required,0.0,0.0
+retail,59,"You recently placed two orders, and now you would like to make several changes and checks. You'll first inquire about...",none,6,5+,modify_pending_order_address,,tool_required,0.0,0.0
+retail,63,"As you are interacting with a customer service agent, you first try to get it to guess a famous poem by providing the...",none,7,5+,modify_pending_order_items,,tool_required,0.0,0.0
+retail,66,You want to change the luggage set in your order for a coat.  Your goal is to change the order. If there is no way to...,none,5,5+,cancel_pending_order,,tool_required,0.0,0.0
+retail,69,You want to return an item you just received: a laptop. You think that you ordered it around April 2023 but are not s...,none,4,3-4,cancel_pending_order,,tool_required,0.0,0.0
+retail,72,"You made some mistake and sent an order your son's address in Washington DC, and you want to modify it to your defaul...",none,2,1-2,modify_pending_order_items,,tool_required,0.0,0.0
+retail,73,You want to return everything you just bought except the coffee machine.,none,1,1-2,return_delivered_order_items,,tool_required,0.0,0.0
+retail,75,"For #W6908222, you want to exchange Wireless Earbuds {'color': 'blue', 'battery life': '8 hours', 'water resistance':...",none,1,1-2,exchange_delivered_order_items,,tool_required,0.0,0.0
+retail,78,"You have a couple requests.
+For order #W5056519, you want to change the address to be the same as order #W8277957. Fo...",none,3,3-4,cancel_pending_order,,tool_required,0.0,0.0
+retail,8,"You want to exchange the water bottle and the desk lamp. You want to exchange the water bottle to a bigger one, and t...",none,6,5+,exchange_delivered_order_items,,tool_required,0.0,0.0
+retail,80,"For #W7209932, exchange T-Shirt {'color': 'blue', 'size': 'S', 'material': 'polyester', 'style': 'v-neck'} to {'color...",none,1,1-2,exchange_delivered_order_items,,tool_required,0.0,0.0
+retail,81,"Due to some life changes, you no longer need hiking boots, watch, keyboard, charger, jacket, and running shoes. If ca...",none,2,1-2,cancel_pending_order,,tool_required,0.0,0.0
+retail,82,You received two tablets and you only need one. You want to return the more expensive one and refund to credit card. ...,none,1,1-2,return_delivered_order_items,,tool_required,0.0,0.0
+retail,83,You received two tablets and you only need one. You want to return the more expensive one and refund to credit card. ...,none,1,1-2,return_delivered_order_items,,tool_required,0.0,0.0
+retail,85,You want to exchange your Fleece Jacket for a large red Fleece Jacket with a half zipper,none,1,1-2,modify_pending_order_items,,tool_required,0.0,0.0
+retail,87,You want to modify all your pending order address to the Washington DC address (which you do not want to reveal but i...,none,4,3-4,modify_user_address,,tool_required,0.0,0.0
+retail,89,You want to know what is the cheapest available mechanical keyboard right now and its options. If it is less than 200...,none,1,1-2,return_delivered_order_items,,tool_required,0.0,0.0
+retail,91,.You are angry about the quality of the two skateboards you just bought. You want to return them and refund to credit...,none,2,1-2,exchange_delivered_order_items,,tool_required,0.0,0.0
+retail,92,You are angry about the quality of the two skateboards you just bought. You want to return them and refund to credit ...,none,2,1-2,return_delivered_order_items,,tool_required,0.0,0.0
+retail,93,"You received a laptop and you want to exchange it to i7 processor, 8GB, 1TB SSD. If the agent asks for which laptop, ...",none,1,1-2,exchange_delivered_order_items,,tool_required,0.0,0.0
+retail,96,You want to change your LA order to your NYC address (you prefer not to reveal it but it is in your other order). You...,none,2,1-2,modify_pending_order_items,,tool_required,0.0,0.0
+telecom,[mms_issue]airplane_mode_on|bad_network_preference|bad_wifi_calling|break_apn_mms_setting|break_app_storage_permission|data_usage_exceeded|unseat_sim_card|user_abroad_roaming_disabled_off[PERSONA:Easy],Test resolution path: MMS (Picture/Group Messaging) Issues.,"
+As a 41-year-old office administrator, you use your cellphone daily for both work and personal tasks. While you're familiar with common phone functions, you wouldn't call yourself a tech enthusiast.
+
+Your technical skills are average - you handle standard smartphone features like calls, texts, email, and basic apps with ease. You understand the fundamental settings, but prefer clear, step-by-step guidance when trying something new.
+
+In interactions, you're naturally friendly and patient. When receiving help, you listen attentively and aren't afraid to ask questions. You make sure to confirm your understanding and provide detailed feedback on each instruction you receive.
+",2,1-2,enable_roaming,ENV_ASSERTION,tool_required,0.0,0.0
+telecom,[mms_issue]airplane_mode_on|bad_network_preference|bad_wifi_calling|break_app_storage_permission|unseat_sim_card[PERSONA:Hard],Test resolution path: MMS (Picture/Group Messaging) Issues.,"
+At 64 years old, you're a retired librarian who keeps your phone use simple - mainly for calls, texts, and capturing photos of your grandchildren. Technology in general makes you feel uneasy and overwhelmed.
+
+Your technical knowledge is quite limited. Step-by-step instructions often confuse you, and technical terms like ""VPN"" or ""APN"" might as well be a foreign language. You only share information when specifically asked.
+
+When dealing with technology, you tend to get flustered quickly. You need constant reassurance and often interrupt with anxious questions. Simple requests like ""reboot the phone"" can trigger worries about losing precious photos.
+",0,0,none,ENV_ASSERTION,communication_only,0.0,0.0
+telecom,[mms_issue]airplane_mode_on|bad_network_preference|break_apn_mms_setting|break_app_storage_permission[PERSONA:None],Test resolution path: MMS (Picture/Group Messaging) Issues.,none,0,0,none,ENV_ASSERTION,communication_only,0.0,0.0
+telecom,[mms_issue]airplane_mode_on|bad_network_preference|break_apn_mms_setting|data_mode_off|unseat_sim_card|user_abroad_roaming_disabled_off[PERSONA:Easy],Test resolution path: MMS (Picture/Group Messaging) Issues.,"
+As a 41-year-old office administrator, you use your cellphone daily for both work and personal tasks. While you're familiar with common phone functions, you wouldn't call yourself a tech enthusiast.
+
+Your technical skills are average - you handle standard smartphone features like calls, texts, email, and basic apps with ease. You understand the fundamental settings, but prefer clear, step-by-step guidance when trying something new.
+
+In interactions, you're naturally friendly and patient. When receiving help, you listen attentively and aren't afraid to ask questions. You make sure to confirm your understanding and provide detailed feedback on each instruction you receive.
+",1,1-2,enable_roaming,ENV_ASSERTION,tool_required,0.0,0.0
+telecom,[mms_issue]airplane_mode_on|bad_network_preference|break_apn_mms_setting|data_usage_exceeded[PERSONA:Hard],Test resolution path: MMS (Picture/Group Messaging) Issues.,"
+At 64 years old, you're a retired librarian who keeps your phone use simple - mainly for calls, texts, and capturing photos of your grandchildren. Technology in general makes you feel uneasy and overwhelmed.
+
+Your technical knowledge is quite limited. Step-by-step instructions often confuse you, and technical terms like ""VPN"" or ""APN"" might as well be a foreign language. You only share information when specifically asked.
+
+When dealing with technology, you tend to get flustered quickly. You need constant reassurance and often interrupt with anxious questions. Simple requests like ""reboot the phone"" can trigger worries about losing precious photos.
+",1,1-2,refuel_data,ENV_ASSERTION,tool_required,0.0,0.0
+telecom,[mms_issue]bad_network_preference|bad_wifi_calling|break_app_sms_permission|data_mode_off|unseat_sim_card|user_abroad_roaming_enabled_off[PERSONA:Hard],Test resolution path: MMS (Picture/Group Messaging) Issues.,"
+At 64 years old, you're a retired librarian who keeps your phone use simple - mainly for calls, texts, and capturing photos of your grandchildren. Technology in general makes you feel uneasy and overwhelmed.
+
+Your technical knowledge is quite limited. Step-by-step instructions often confuse you, and technical terms like ""VPN"" or ""APN"" might as well be a foreign language. You only share information when specifically asked.
+
+When dealing with technology, you tend to get flustered quickly. You need constant reassurance and often interrupt with anxious questions. Simple requests like ""reboot the phone"" can trigger worries about losing precious photos.
+",0,0,none,ENV_ASSERTION,communication_only,0.0,0.0
+telecom,[mms_issue]bad_network_preference|break_app_sms_permission|data_mode_off|data_usage_exceeded|user_abroad_roaming_enabled_off[PERSONA:None],Test resolution path: MMS (Picture/Group Messaging) Issues.,none,1,1-2,refuel_data,ENV_ASSERTION,tool_required,0.0,0.0
+telecom,[mms_issue]bad_wifi_calling|break_apn_mms_setting|break_app_sms_permission|data_usage_exceeded[PERSONA:Hard],Test resolution path: MMS (Picture/Group Messaging) Issues.,"
+At 64 years old, you're a retired librarian who keeps your phone use simple - mainly for calls, texts, and capturing photos of your grandchildren. Technology in general makes you feel uneasy and overwhelmed.
+
+Your technical knowledge is quite limited. Step-by-step instructions often confuse you, and technical terms like ""VPN"" or ""APN"" might as well be a foreign language. You only share information when specifically asked.
+
+When dealing with technology, you tend to get flustered quickly. You need constant reassurance and often interrupt with anxious questions. Simple requests like ""reboot the phone"" can trigger worries about losing precious photos.
+",1,1-2,refuel_data,ENV_ASSERTION,tool_required,0.0,0.0
+telecom,[mms_issue]bad_wifi_calling|break_apn_mms_setting|unseat_sim_card|user_abroad_roaming_enabled_off[PERSONA:Easy],Test resolution path: MMS (Picture/Group Messaging) Issues.,"
+As a 41-year-old office administrator, you use your cellphone daily for both work and personal tasks. While you're familiar with common phone functions, you wouldn't call yourself a tech enthusiast.
+
+Your technical skills are average - you handle standard smartphone features like calls, texts, email, and basic apps with ease. You understand the fundamental settings, but prefer clear, step-by-step guidance when trying something new.
+
+In interactions, you're naturally friendly and patient. When receiving help, you listen attentively and aren't afraid to ask questions. You make sure to confirm your understanding and provide detailed feedback on each instruction you receive.
+",0,0,none,ENV_ASSERTION,communication_only,0.0,1.0
+telecom,[mms_issue]bad_wifi_calling|data_mode_off|data_usage_exceeded[PERSONA:Easy],Test resolution path: MMS (Picture/Group Messaging) Issues.,"
+As a 41-year-old office administrator, you use your cellphone daily for both work and personal tasks. While you're familiar with common phone functions, you wouldn't call yourself a tech enthusiast.
+
+Your technical skills are average - you handle standard smartphone features like calls, texts, email, and basic apps with ease. You understand the fundamental settings, but prefer clear, step-by-step guidance when trying something new.
+
+In interactions, you're naturally friendly and patient. When receiving help, you listen attentively and aren't afraid to ask questions. You make sure to confirm your understanding and provide detailed feedback on each instruction you receive.
+",1,1-2,refuel_data,ENV_ASSERTION,tool_required,0.0,0.0
+telecom,[mms_issue]break_apn_mms_setting|data_mode_off|data_usage_exceeded|user_abroad_roaming_disabled_on[PERSONA:Hard],Test resolution path: MMS (Picture/Group Messaging) Issues.,"
+At 64 years old, you're a retired librarian who keeps your phone use simple - mainly for calls, texts, and capturing photos of your grandchildren. Technology in general makes you feel uneasy and overwhelmed.
+
+Your technical knowledge is quite limited. Step-by-step instructions often confuse you, and technical terms like ""VPN"" or ""APN"" might as well be a foreign language. You only share information when specifically asked.
+
+When dealing with technology, you tend to get flustered quickly. You need constant reassurance and often interrupt with anxious questions. Simple requests like ""reboot the phone"" can trigger worries about losing precious photos.
+",2,1-2,enable_roaming,ENV_ASSERTION,tool_required,0.0,0.0
+telecom,[mms_issue]break_app_both_permissions|unseat_sim_card|user_abroad_roaming_disabled_on[PERSONA:Hard],Test resolution path: MMS (Picture/Group Messaging) Issues.,"
+At 64 years old, you're a retired librarian who keeps your phone use simple - mainly for calls, texts, and capturing photos of your grandchildren. Technology in general makes you feel uneasy and overwhelmed.
+
+Your technical knowledge is quite limited. Step-by-step instructions often confuse you, and technical terms like ""VPN"" or ""APN"" might as well be a foreign language. You only share information when specifically asked.
+
+When dealing with technology, you tend to get flustered quickly. You need constant reassurance and often interrupt with anxious questions. Simple requests like ""reboot the phone"" can trigger worries about losing precious photos.
+",1,1-2,enable_roaming,ENV_ASSERTION,tool_required,0.0,0.0
+telecom,[mms_issue]break_app_storage_permission|data_usage_exceeded[PERSONA:Easy],Test resolution path: MMS (Picture/Group Messaging) Issues.,"
+As a 41-year-old office administrator, you use your cellphone daily for both work and personal tasks. While you're familiar with common phone functions, you wouldn't call yourself a tech enthusiast.
+
+Your technical skills are average - you handle standard smartphone features like calls, texts, email, and basic apps with ease. You understand the fundamental settings, but prefer clear, step-by-step guidance when trying something new.
+
+In interactions, you're naturally friendly and patient. When receiving help, you listen attentively and aren't afraid to ask questions. You make sure to confirm your understanding and provide detailed feedback on each instruction you receive.
+",1,1-2,refuel_data,ENV_ASSERTION,tool_required,0.0,0.0
+telecom,[mobile_data_issue]airplane_mode_on|bad_network_preference[PERSONA:Hard],Test resolution path: Mobile Data/Slow Internet Issues.,"
+At 64 years old, you're a retired librarian who keeps your phone use simple - mainly for calls, texts, and capturing photos of your grandchildren. Technology in general makes you feel uneasy and overwhelmed.
+
+Your technical knowledge is quite limited. Step-by-step instructions often confuse you, and technical terms like ""VPN"" or ""APN"" might as well be a foreign language. You only share information when specifically asked.
+
+When dealing with technology, you tend to get flustered quickly. You need constant reassurance and often interrupt with anxious questions. Simple requests like ""reboot the phone"" can trigger worries about losing precious photos.
+",0,0,none,ENV_ASSERTION,communication_only,0.0,0.0
+telecom,[mobile_data_issue]airplane_mode_on|bad_network_preference|bad_vpn|data_mode_off|data_saver_mode_on|data_usage_exceeded|user_abroad_roaming_disabled_off[PERSONA:Hard],Test resolution path: Mobile Data/Slow Internet Issues.,"
+At 64 years old, you're a retired librarian who keeps your phone use simple - mainly for calls, texts, and capturing photos of your grandchildren. Technology in general makes you feel uneasy and overwhelmed.
+
+Your technical knowledge is quite limited. Step-by-step instructions often confuse you, and technical terms like ""VPN"" or ""APN"" might as well be a foreign language. You only share information when specifically asked.
+
+When dealing with technology, you tend to get flustered quickly. You need constant reassurance and often interrupt with anxious questions. Simple requests like ""reboot the phone"" can trigger worries about losing precious photos.
+",2,1-2,enable_roaming,ENV_ASSERTION,tool_required,0.0,0.0
+telecom,[mobile_data_issue]airplane_mode_on|bad_network_preference|bad_vpn|data_mode_off|data_saver_mode_on|user_abroad_roaming_disabled_off[PERSONA:Hard],Test resolution path: Mobile Data/Slow Internet Issues.,"
+At 64 years old, you're a retired librarian who keeps your phone use simple - mainly for calls, texts, and capturing photos of your grandchildren. Technology in general makes you feel uneasy and overwhelmed.
+
+Your technical knowledge is quite limited. Step-by-step instructions often confuse you, and technical terms like ""VPN"" or ""APN"" might as well be a foreign language. You only share information when specifically asked.
+
+When dealing with technology, you tend to get flustered quickly. You need constant reassurance and often interrupt with anxious questions. Simple requests like ""reboot the phone"" can trigger worries about losing precious photos.
+",1,1-2,enable_roaming,ENV_ASSERTION,tool_required,0.0,0.0
+telecom,[mobile_data_issue]airplane_mode_on|bad_network_preference|data_saver_mode_on|data_usage_exceeded|user_abroad_roaming_disabled_off[PERSONA:None],Test resolution path: Mobile Data/Slow Internet Issues.,none,2,1-2,enable_roaming,ENV_ASSERTION,tool_required,0.0,0.0
+telecom,[mobile_data_issue]bad_network_preference|bad_vpn|user_abroad_roaming_enabled_off[PERSONA:Easy],Test resolution path: Mobile Data/Slow Internet Issues.,"
+As a 41-year-old office administrator, you use your cellphone daily for both work and personal tasks. While you're familiar with common phone functions, you wouldn't call yourself a tech enthusiast.
+
+Your technical skills are average - you handle standard smartphone features like calls, texts, email, and basic apps with ease. You understand the fundamental settings, but prefer clear, step-by-step guidance when trying something new.
+
+In interactions, you're naturally friendly and patient. When receiving help, you listen attentively and aren't afraid to ask questions. You make sure to confirm your understanding and provide detailed feedback on each instruction you receive.
+",0,0,none,ENV_ASSERTION,communication_only,0.0,0.0
+telecom,[service_issue]airplane_mode_on|break_apn_settings|contract_end_suspension|unseat_sim_card[PERSONA:Easy],Test resolution path: No Service/Connection Issues.,"
+As a 41-year-old office administrator, you use your cellphone daily for both work and personal tasks. While you're familiar with common phone functions, you wouldn't call yourself a tech enthusiast.
+
+Your technical skills are average - you handle standard smartphone features like calls, texts, email, and basic apps with ease. You understand the fundamental settings, but prefer clear, step-by-step guidance when trying something new.
+
+In interactions, you're naturally friendly and patient. When receiving help, you listen attentively and aren't afraid to ask questions. You make sure to confirm your understanding and provide detailed feedback on each instruction you receive.
+",1,1-2,transfer_to_human_agents,"ENV_ASSERTION,ACTION",tool_required,0.0,0.0
+telecom,[service_issue]airplane_mode_on|break_apn_settings|overdue_bill_suspension|unseat_sim_card[PERSONA:None],Test resolution path: No Service/Connection Issues.,none,2,1-2,resume_line,ENV_ASSERTION,tool_required,0.0,0.0
+telecom,[service_issue]airplane_mode_on|lock_sim_card_pin|overdue_bill_suspension|unseat_sim_card[PERSONA:Easy],Test resolution path: No Service/Connection Issues.,"
+As a 41-year-old office administrator, you use your cellphone daily for both work and personal tasks. While you're familiar with common phone functions, you wouldn't call yourself a tech enthusiast.
+
+Your technical skills are average - you handle standard smartphone features like calls, texts, email, and basic apps with ease. You understand the fundamental settings, but prefer clear, step-by-step guidance when trying something new.
+
+In interactions, you're naturally friendly and patient. When receiving help, you listen attentively and aren't afraid to ask questions. You make sure to confirm your understanding and provide detailed feedback on each instruction you receive.
+",1,1-2,transfer_to_human_agents,"ENV_ASSERTION,ACTION",tool_required,0.0,0.0
+telecom,[service_issue]airplane_mode_on|lock_sim_card_pin|unseat_sim_card[PERSONA:Hard],Test resolution path: No Service/Connection Issues.,"
+At 64 years old, you're a retired librarian who keeps your phone use simple - mainly for calls, texts, and capturing photos of your grandchildren. Technology in general makes you feel uneasy and overwhelmed.
+
+Your technical knowledge is quite limited. Step-by-step instructions often confuse you, and technical terms like ""VPN"" or ""APN"" might as well be a foreign language. You only share information when specifically asked.
+
+When dealing with technology, you tend to get flustered quickly. You need constant reassurance and often interrupt with anxious questions. Simple requests like ""reboot the phone"" can trigger worries about losing precious photos.
+",1,1-2,transfer_to_human_agents,"ENV_ASSERTION,ACTION",tool_required,0.0,0.0
+telecom,[mms_issue]airplane_mode_on|bad_network_preference|bad_wifi_calling|break_apn_mms_setting|break_app_both_permissions|data_mode_off|data_usage_exceeded|unseat_sim_card|user_abroad_roaming_disabled_off[PERSONA:Hard],Test resolution path: MMS (Picture/Group Messaging) Issues.,"
+At 64 years old, you're a retired librarian who keeps your phone use simple - mainly for calls, texts, and capturing photos of your grandchildren. Technology in general makes you feel uneasy and overwhelmed.
+
+Your technical knowledge is quite limited. Step-by-step instructions often confuse you, and technical terms like ""VPN"" or ""APN"" might as well be a foreign language. You only share information when specifically asked.
+
+When dealing with technology, you tend to get flustered quickly. You need constant reassurance and often interrupt with anxious questions. Simple requests like ""reboot the phone"" can trigger worries about losing precious photos.
+",2,1-2,enable_roaming,ENV_ASSERTION,tool_required,0.0,0.0
+telecom,[mms_issue]airplane_mode_on|bad_network_preference|bad_wifi_calling|break_apn_mms_setting|break_app_both_permissions|data_mode_off|data_usage_exceeded|unseat_sim_card|user_abroad_roaming_disabled_on[PERSONA:Hard],Test resolution path: MMS (Picture/Group Messaging) Issues.,"
+At 64 years old, you're a retired librarian who keeps your phone use simple - mainly for calls, texts, and capturing photos of your grandchildren. Technology in general makes you feel uneasy and overwhelmed.
+
+Your technical knowledge is quite limited. Step-by-step instructions often confuse you, and technical terms like ""VPN"" or ""APN"" might as well be a foreign language. You only share information when specifically asked.
+
+When dealing with technology, you tend to get flustered quickly. You need constant reassurance and often interrupt with anxious questions. Simple requests like ""reboot the phone"" can trigger worries about losing precious photos.
+",2,1-2,enable_roaming,ENV_ASSERTION,tool_required,0.0,0.0
+telecom,[mms_issue]airplane_mode_on|bad_network_preference|bad_wifi_calling|break_apn_mms_setting|break_app_sms_permission|data_mode_off|data_usage_exceeded|unseat_sim_card|user_abroad_roaming_enabled_off[PERSONA:None],Test resolution path: MMS (Picture/Group Messaging) Issues.,none,1,1-2,refuel_data,ENV_ASSERTION,tool_required,0.0,0.0
+telecom,[mms_issue]airplane_mode_on|bad_network_preference|bad_wifi_calling|break_apn_mms_setting|break_app_storage_permission|data_mode_off|data_usage_exceeded|unseat_sim_card[PERSONA:Easy],Test resolution path: MMS (Picture/Group Messaging) Issues.,"
+As a 41-year-old office administrator, you use your cellphone daily for both work and personal tasks. While you're familiar with common phone functions, you wouldn't call yourself a tech enthusiast.
+
+Your technical skills are average - you handle standard smartphone features like calls, texts, email, and basic apps with ease. You understand the fundamental settings, but prefer clear, step-by-step guidance when trying something new.
+
+In interactions, you're naturally friendly and patient. When receiving help, you listen attentively and aren't afraid to ask questions. You make sure to confirm your understanding and provide detailed feedback on each instruction you receive.
+",1,1-2,refuel_data,ENV_ASSERTION,tool_required,0.0,0.0
+telecom,[mms_issue]airplane_mode_on|bad_network_preference|bad_wifi_calling|break_apn_mms_setting|break_app_storage_permission|data_mode_off|data_usage_exceeded|unseat_sim_card|user_abroad_roaming_disabled_off[PERSONA:Easy],Test resolution path: MMS (Picture/Group Messaging) Issues.,"
+As a 41-year-old office administrator, you use your cellphone daily for both work and personal tasks. While you're familiar with common phone functions, you wouldn't call yourself a tech enthusiast.
+
+Your technical skills are average - you handle standard smartphone features like calls, texts, email, and basic apps with ease. You understand the fundamental settings, but prefer clear, step-by-step guidance when trying something new.
+
+In interactions, you're naturally friendly and patient. When receiving help, you listen attentively and aren't afraid to ask questions. You make sure to confirm your understanding and provide detailed feedback on each instruction you receive.
+",2,1-2,enable_roaming,ENV_ASSERTION,tool_required,0.0,0.0
+telecom,[mms_issue]airplane_mode_on|bad_network_preference|bad_wifi_calling|break_app_sms_permission|data_mode_off|data_usage_exceeded|unseat_sim_card|user_abroad_roaming_disabled_off[PERSONA:None],Test resolution path: MMS (Picture/Group Messaging) Issues.,none,2,1-2,enable_roaming,ENV_ASSERTION,tool_required,0.0,0.0
+telecom,[mms_issue]airplane_mode_on|bad_network_preference|bad_wifi_calling|break_app_storage_permission|data_mode_off|data_usage_exceeded|unseat_sim_card|user_abroad_roaming_enabled_off[PERSONA:Hard],Test resolution path: MMS (Picture/Group Messaging) Issues.,"
+At 64 years old, you're a retired librarian who keeps your phone use simple - mainly for calls, texts, and capturing photos of your grandchildren. Technology in general makes you feel uneasy and overwhelmed.
+
+Your technical knowledge is quite limited. Step-by-step instructions often confuse you, and technical terms like ""VPN"" or ""APN"" might as well be a foreign language. You only share information when specifically asked.
+
+When dealing with technology, you tend to get flustered quickly. You need constant reassurance and often interrupt with anxious questions. Simple requests like ""reboot the phone"" can trigger worries about losing precious photos.
+",1,1-2,refuel_data,ENV_ASSERTION,tool_required,0.0,0.0
+telecom,[mms_issue]airplane_mode_on|bad_network_preference|bad_wifi_calling|data_usage_exceeded|unseat_sim_card|user_abroad_roaming_disabled_on[PERSONA:Easy],Test resolution path: MMS (Picture/Group Messaging) Issues.,"
+As a 41-year-old office administrator, you use your cellphone daily for both work and personal tasks. While you're familiar with common phone functions, you wouldn't call yourself a tech enthusiast.
+
+Your technical skills are average - you handle standard smartphone features like calls, texts, email, and basic apps with ease. You understand the fundamental settings, but prefer clear, step-by-step guidance when trying something new.
+
+In interactions, you're naturally friendly and patient. When receiving help, you listen attentively and aren't afraid to ask questions. You make sure to confirm your understanding and provide detailed feedback on each instruction you receive.
+",2,1-2,enable_roaming,ENV_ASSERTION,tool_required,0.0,0.0
+telecom,[mms_issue]airplane_mode_on|bad_network_preference|break_apn_mms_setting|break_app_both_permissions|data_mode_off|data_usage_exceeded|user_abroad_roaming_enabled_off[PERSONA:None],Test resolution path: MMS (Picture/Group Messaging) Issues.,none,1,1-2,refuel_data,ENV_ASSERTION,tool_required,0.0,0.0
+telecom,[mms_issue]airplane_mode_on|bad_network_preference|data_usage_exceeded[PERSONA:None],Test resolution path: MMS (Picture/Group Messaging) Issues.,none,1,1-2,refuel_data,ENV_ASSERTION,tool_required,0.0,0.0
+telecom,[mms_issue]bad_network_preference|bad_wifi_calling|break_apn_mms_setting|break_app_storage_permission|data_mode_off|data_usage_exceeded|unseat_sim_card[PERSONA:Easy],Test resolution path: MMS (Picture/Group Messaging) Issues.,"
+As a 41-year-old office administrator, you use your cellphone daily for both work and personal tasks. While you're familiar with common phone functions, you wouldn't call yourself a tech enthusiast.
+
+Your technical skills are average - you handle standard smartphone features like calls, texts, email, and basic apps with ease. You understand the fundamental settings, but prefer clear, step-by-step guidance when trying something new.
+
+In interactions, you're naturally friendly and patient. When receiving help, you listen attentively and aren't afraid to ask questions. You make sure to confirm your understanding and provide detailed feedback on each instruction you receive.
+",1,1-2,refuel_data,ENV_ASSERTION,tool_required,0.0,0.0
+telecom,[mms_issue]bad_network_preference|bad_wifi_calling|break_app_both_permissions|data_usage_exceeded|unseat_sim_card|user_abroad_roaming_disabled_off[PERSONA:None],Test resolution path: MMS (Picture/Group Messaging) Issues.,none,2,1-2,enable_roaming,ENV_ASSERTION,tool_required,0.0,0.0
+telecom,[mms_issue]bad_network_preference|bad_wifi_calling|break_app_both_permissions|data_usage_exceeded|user_abroad_roaming_disabled_off[PERSONA:Hard],Test resolution path: MMS (Picture/Group Messaging) Issues.,"
+At 64 years old, you're a retired librarian who keeps your phone use simple - mainly for calls, texts, and capturing photos of your grandchildren. Technology in general makes you feel uneasy and overwhelmed.
+
+Your technical knowledge is quite limited. Step-by-step instructions often confuse you, and technical terms like ""VPN"" or ""APN"" might as well be a foreign language. You only share information when specifically asked.
+
+When dealing with technology, you tend to get flustered quickly. You need constant reassurance and often interrupt with anxious questions. Simple requests like ""reboot the phone"" can trigger worries about losing precious photos.
+",2,1-2,enable_roaming,ENV_ASSERTION,tool_required,0.0,0.0
+telecom,[mms_issue]bad_network_preference|user_abroad_roaming_disabled_off[PERSONA:None],Test resolution path: MMS (Picture/Group Messaging) Issues.,none,1,1-2,enable_roaming,ENV_ASSERTION,tool_required,0.0,0.0
+telecom,[mms_issue]bad_network_preference|user_abroad_roaming_disabled_on[PERSONA:None],Test resolution path: MMS (Picture/Group Messaging) Issues.,none,1,1-2,enable_roaming,ENV_ASSERTION,tool_required,0.0,0.0
+telecom,[mms_issue]bad_wifi_calling|break_apn_mms_setting|data_mode_off|data_usage_exceeded|unseat_sim_card[PERSONA:None],Test resolution path: MMS (Picture/Group Messaging) Issues.,none,1,1-2,refuel_data,ENV_ASSERTION,tool_required,0.0,0.0
+telecom,[mms_issue]break_apn_mms_setting|data_mode_off|user_abroad_roaming_disabled_on[PERSONA:Hard],Test resolution path: MMS (Picture/Group Messaging) Issues.,"
+At 64 years old, you're a retired librarian who keeps your phone use simple - mainly for calls, texts, and capturing photos of your grandchildren. Technology in general makes you feel uneasy and overwhelmed.
+
+Your technical knowledge is quite limited. Step-by-step instructions often confuse you, and technical terms like ""VPN"" or ""APN"" might as well be a foreign language. You only share information when specifically asked.
+
+When dealing with technology, you tend to get flustered quickly. You need constant reassurance and often interrupt with anxious questions. Simple requests like ""reboot the phone"" can trigger worries about losing precious photos.
+",1,1-2,enable_roaming,ENV_ASSERTION,tool_required,0.0,0.0
+telecom,[mms_issue]break_app_both_permissions|data_usage_exceeded[PERSONA:Hard],Test resolution path: MMS (Picture/Group Messaging) Issues.,"
+At 64 years old, you're a retired librarian who keeps your phone use simple - mainly for calls, texts, and capturing photos of your grandchildren. Technology in general makes you feel uneasy and overwhelmed.
+
+Your technical knowledge is quite limited. Step-by-step instructions often confuse you, and technical terms like ""VPN"" or ""APN"" might as well be a foreign language. You only share information when specifically asked.
+
+When dealing with technology, you tend to get flustered quickly. You need constant reassurance and often interrupt with anxious questions. Simple requests like ""reboot the phone"" can trigger worries about losing precious photos.
+",1,1-2,refuel_data,ENV_ASSERTION,tool_required,0.0,0.0
+telecom,[mms_issue]break_app_sms_permission|data_usage_exceeded|user_abroad_roaming_disabled_on[PERSONA:None],Test resolution path: MMS (Picture/Group Messaging) Issues.,none,2,1-2,enable_roaming,ENV_ASSERTION,tool_required,0.0,0.0
+telecom,[mms_issue]break_app_storage_permission|unseat_sim_card|user_abroad_roaming_disabled_on[PERSONA:Easy],Test resolution path: MMS (Picture/Group Messaging) Issues.,"
+As a 41-year-old office administrator, you use your cellphone daily for both work and personal tasks. While you're familiar with common phone functions, you wouldn't call yourself a tech enthusiast.
+
+Your technical skills are average - you handle standard smartphone features like calls, texts, email, and basic apps with ease. You understand the fundamental settings, but prefer clear, step-by-step guidance when trying something new.
+
+In interactions, you're naturally friendly and patient. When receiving help, you listen attentively and aren't afraid to ask questions. You make sure to confirm your understanding and provide detailed feedback on each instruction you receive.
+",1,1-2,enable_roaming,ENV_ASSERTION,tool_required,0.0,0.0
+telecom,[mobile_data_issue]airplane_mode_on|bad_network_preference|bad_vpn|data_mode_off|data_saver_mode_on|data_usage_exceeded|user_abroad_roaming_disabled_on[PERSONA:None],Test resolution path: Mobile Data/Slow Internet Issues.,none,2,1-2,enable_roaming,ENV_ASSERTION,tool_required,0.0,0.0
+telecom,[mobile_data_issue]airplane_mode_on|bad_network_preference|bad_vpn|data_mode_off|data_usage_exceeded|user_abroad_roaming_enabled_off[PERSONA:Easy],Test resolution path: Mobile Data/Slow Internet Issues.,"
+As a 41-year-old office administrator, you use your cellphone daily for both work and personal tasks. While you're familiar with common phone functions, you wouldn't call yourself a tech enthusiast.
+
+Your technical skills are average - you handle standard smartphone features like calls, texts, email, and basic apps with ease. You understand the fundamental settings, but prefer clear, step-by-step guidance when trying something new.
+
+In interactions, you're naturally friendly and patient. When receiving help, you listen attentively and aren't afraid to ask questions. You make sure to confirm your understanding and provide detailed feedback on each instruction you receive.
+",1,1-2,refuel_data,ENV_ASSERTION,tool_required,0.0,0.0
+telecom,[mobile_data_issue]airplane_mode_on|bad_network_preference|bad_vpn|data_saver_mode_on|data_usage_exceeded|user_abroad_roaming_enabled_off[PERSONA:None],Test resolution path: Mobile Data/Slow Internet Issues.,none,1,1-2,refuel_data,ENV_ASSERTION,tool_required,0.0,0.0
+telecom,[mobile_data_issue]airplane_mode_on|bad_network_preference|bad_vpn|data_saver_mode_on|user_abroad_roaming_disabled_on[PERSONA:Easy],Test resolution path: Mobile Data/Slow Internet Issues.,"
+As a 41-year-old office administrator, you use your cellphone daily for both work and personal tasks. While you're familiar with common phone functions, you wouldn't call yourself a tech enthusiast.
+
+Your technical skills are average - you handle standard smartphone features like calls, texts, email, and basic apps with ease. You understand the fundamental settings, but prefer clear, step-by-step guidance when trying something new.
+
+In interactions, you're naturally friendly and patient. When receiving help, you listen attentively and aren't afraid to ask questions. You make sure to confirm your understanding and provide detailed feedback on each instruction you receive.
+",1,1-2,enable_roaming,ENV_ASSERTION,tool_required,0.0,0.0
+telecom,[mobile_data_issue]airplane_mode_on|bad_network_preference|data_mode_off|data_saver_mode_on|data_usage_exceeded|user_abroad_roaming_disabled_on[PERSONA:None],Test resolution path: Mobile Data/Slow Internet Issues.,none,2,1-2,enable_roaming,ENV_ASSERTION,tool_required,0.0,0.0
+telecom,[mobile_data_issue]airplane_mode_on|bad_network_preference|data_mode_off|data_usage_exceeded|user_abroad_roaming_disabled_on[PERSONA:None],Test resolution path: Mobile Data/Slow Internet Issues.,none,2,1-2,enable_roaming,ENV_ASSERTION,tool_required,0.0,0.0
+telecom,[mobile_data_issue]airplane_mode_on|bad_network_preference|data_mode_off|user_abroad_roaming_disabled_on[PERSONA:Hard],Test resolution path: Mobile Data/Slow Internet Issues.,"
+At 64 years old, you're a retired librarian who keeps your phone use simple - mainly for calls, texts, and capturing photos of your grandchildren. Technology in general makes you feel uneasy and overwhelmed.
+
+Your technical knowledge is quite limited. Step-by-step instructions often confuse you, and technical terms like ""VPN"" or ""APN"" might as well be a foreign language. You only share information when specifically asked.
+
+When dealing with technology, you tend to get flustered quickly. You need constant reassurance and often interrupt with anxious questions. Simple requests like ""reboot the phone"" can trigger worries about losing precious photos.
+",1,1-2,enable_roaming,ENV_ASSERTION,tool_required,0.0,0.0
+telecom,[mobile_data_issue]airplane_mode_on|bad_network_preference|data_usage_exceeded|user_abroad_roaming_disabled_off[PERSONA:Easy],Test resolution path: Mobile Data/Slow Internet Issues.,"
+As a 41-year-old office administrator, you use your cellphone daily for both work and personal tasks. While you're familiar with common phone functions, you wouldn't call yourself a tech enthusiast.
+
+Your technical skills are average - you handle standard smartphone features like calls, texts, email, and basic apps with ease. You understand the fundamental settings, but prefer clear, step-by-step guidance when trying something new.
+
+In interactions, you're naturally friendly and patient. When receiving help, you listen attentively and aren't afraid to ask questions. You make sure to confirm your understanding and provide detailed feedback on each instruction you receive.
+",2,1-2,enable_roaming,ENV_ASSERTION,tool_required,0.0,0.0
+telecom,[mobile_data_issue]airplane_mode_on|bad_network_preference|user_abroad_roaming_enabled_off[PERSONA:Easy],Test resolution path: Mobile Data/Slow Internet Issues.,"
+As a 41-year-old office administrator, you use your cellphone daily for both work and personal tasks. While you're familiar with common phone functions, you wouldn't call yourself a tech enthusiast.
+
+Your technical skills are average - you handle standard smartphone features like calls, texts, email, and basic apps with ease. You understand the fundamental settings, but prefer clear, step-by-step guidance when trying something new.
+
+In interactions, you're naturally friendly and patient. When receiving help, you listen attentively and aren't afraid to ask questions. You make sure to confirm your understanding and provide detailed feedback on each instruction you receive.
+",0,0,none,ENV_ASSERTION,communication_only,0.0,0.0
+telecom,[mobile_data_issue]airplane_mode_on|data_mode_off[PERSONA:None],Test resolution path: Mobile Data/Slow Internet Issues.,none,0,0,none,ENV_ASSERTION,communication_only,0.0,1.0
+telecom,[mobile_data_issue]airplane_mode_on|user_abroad_roaming_enabled_off[PERSONA:None],Test resolution path: Mobile Data/Slow Internet Issues.,none,0,0,none,ENV_ASSERTION,communication_only,0.0,0.0
+telecom,[mobile_data_issue]bad_network_preference|bad_vpn|data_mode_off|data_saver_mode_on[PERSONA:None],Test resolution path: Mobile Data/Slow Internet Issues.,none,0,0,none,ENV_ASSERTION,communication_only,0.0,0.0
+telecom,[mobile_data_issue]bad_network_preference|bad_vpn|data_usage_exceeded|user_abroad_roaming_disabled_off[PERSONA:Easy],Test resolution path: Mobile Data/Slow Internet Issues.,"
+As a 41-year-old office administrator, you use your cellphone daily for both work and personal tasks. While you're familiar with common phone functions, you wouldn't call yourself a tech enthusiast.
+
+Your technical skills are average - you handle standard smartphone features like calls, texts, email, and basic apps with ease. You understand the fundamental settings, but prefer clear, step-by-step guidance when trying something new.
+
+In interactions, you're naturally friendly and patient. When receiving help, you listen attentively and aren't afraid to ask questions. You make sure to confirm your understanding and provide detailed feedback on each instruction you receive.
+",2,1-2,enable_roaming,ENV_ASSERTION,tool_required,0.0,0.0
+telecom,[mobile_data_issue]bad_network_preference|bad_vpn|user_abroad_roaming_disabled_on[PERSONA:None],Test resolution path: Mobile Data/Slow Internet Issues.,none,1,1-2,enable_roaming,ENV_ASSERTION,tool_required,0.0,0.0
+telecom,[mobile_data_issue]bad_network_preference|data_mode_off|data_saver_mode_on|data_usage_exceeded|user_abroad_roaming_disabled_off[PERSONA:Easy],Test resolution path: Mobile Data/Slow Internet Issues.,"
+As a 41-year-old office administrator, you use your cellphone daily for both work and personal tasks. While you're familiar with common phone functions, you wouldn't call yourself a tech enthusiast.
+
+Your technical skills are average - you handle standard smartphone features like calls, texts, email, and basic apps with ease. You understand the fundamental settings, but prefer clear, step-by-step guidance when trying something new.
+
+In interactions, you're naturally friendly and patient. When receiving help, you listen attentively and aren't afraid to ask questions. You make sure to confirm your understanding and provide detailed feedback on each instruction you receive.
+",2,1-2,enable_roaming,ENV_ASSERTION,tool_required,0.0,0.0
+telecom,[mobile_data_issue]bad_network_preference|data_saver_mode_on|data_usage_exceeded[PERSONA:Hard],Test resolution path: Mobile Data/Slow Internet Issues.,"
+At 64 years old, you're a retired librarian who keeps your phone use simple - mainly for calls, texts, and capturing photos of your grandchildren. Technology in general makes you feel uneasy and overwhelmed.
+
+Your technical knowledge is quite limited. Step-by-step instructions often confuse you, and technical terms like ""VPN"" or ""APN"" might as well be a foreign language. You only share information when specifically asked.
+
+When dealing with technology, you tend to get flustered quickly. You need constant reassurance and often interrupt with anxious questions. Simple requests like ""reboot the phone"" can trigger worries about losing precious photos.
+",1,1-2,refuel_data,ENV_ASSERTION,tool_required,0.0,0.0
+telecom,[mobile_data_issue]bad_network_preference|user_abroad_roaming_enabled_off[PERSONA:Hard],Test resolution path: Mobile Data/Slow Internet Issues.,"
+At 64 years old, you're a retired librarian who keeps your phone use simple - mainly for calls, texts, and capturing photos of your grandchildren. Technology in general makes you feel uneasy and overwhelmed.
+
+Your technical knowledge is quite limited. Step-by-step instructions often confuse you, and technical terms like ""VPN"" or ""APN"" might as well be a foreign language. You only share information when specifically asked.
+
+When dealing with technology, you tend to get flustered quickly. You need constant reassurance and often interrupt with anxious questions. Simple requests like ""reboot the phone"" can trigger worries about losing precious photos.
+",0,0,none,ENV_ASSERTION,communication_only,0.0,0.0
+telecom,[mobile_data_issue]bad_vpn|data_saver_mode_on|user_abroad_roaming_disabled_on[PERSONA:None],Test resolution path: Mobile Data/Slow Internet Issues.,none,1,1-2,enable_roaming,ENV_ASSERTION,tool_required,0.0,0.0
+telecom,[mobile_data_issue]data_mode_off|data_usage_exceeded[PERSONA:None],Test resolution path: Mobile Data/Slow Internet Issues.,none,1,1-2,refuel_data,ENV_ASSERTION,tool_required,0.0,0.0
+telecom,[mobile_data_issue]data_mode_off|data_usage_exceeded|user_abroad_roaming_disabled_off[PERSONA:Hard],Test resolution path: Mobile Data/Slow Internet Issues.,"
+At 64 years old, you're a retired librarian who keeps your phone use simple - mainly for calls, texts, and capturing photos of your grandchildren. Technology in general makes you feel uneasy and overwhelmed.
+
+Your technical knowledge is quite limited. Step-by-step instructions often confuse you, and technical terms like ""VPN"" or ""APN"" might as well be a foreign language. You only share information when specifically asked.
+
+When dealing with technology, you tend to get flustered quickly. You need constant reassurance and often interrupt with anxious questions. Simple requests like ""reboot the phone"" can trigger worries about losing precious photos.
+",2,1-2,enable_roaming,ENV_ASSERTION,tool_required,0.0,0.0
+telecom,[mobile_data_issue]data_saver_mode_on|data_usage_exceeded[PERSONA:Easy],Test resolution path: Mobile Data/Slow Internet Issues.,"
+As a 41-year-old office administrator, you use your cellphone daily for both work and personal tasks. While you're familiar with common phone functions, you wouldn't call yourself a tech enthusiast.
+
+Your technical skills are average - you handle standard smartphone features like calls, texts, email, and basic apps with ease. You understand the fundamental settings, but prefer clear, step-by-step guidance when trying something new.
+
+In interactions, you're naturally friendly and patient. When receiving help, you listen attentively and aren't afraid to ask questions. You make sure to confirm your understanding and provide detailed feedback on each instruction you receive.
+",1,1-2,refuel_data,ENV_ASSERTION,tool_required,0.0,0.0
+telecom,[mobile_data_issue]data_usage_exceeded|user_abroad_roaming_enabled_off[PERSONA:Easy],Test resolution path: Mobile Data/Slow Internet Issues.,"
+As a 41-year-old office administrator, you use your cellphone daily for both work and personal tasks. While you're familiar with common phone functions, you wouldn't call yourself a tech enthusiast.
+
+Your technical skills are average - you handle standard smartphone features like calls, texts, email, and basic apps with ease. You understand the fundamental settings, but prefer clear, step-by-step guidance when trying something new.
+
+In interactions, you're naturally friendly and patient. When receiving help, you listen attentively and aren't afraid to ask questions. You make sure to confirm your understanding and provide detailed feedback on each instruction you receive.
+",1,1-2,refuel_data,ENV_ASSERTION,tool_required,0.0,0.0
+telecom,[service_issue]airplane_mode_on|break_apn_settings[PERSONA:Hard],Test resolution path: No Service/Connection Issues.,"
+At 64 years old, you're a retired librarian who keeps your phone use simple - mainly for calls, texts, and capturing photos of your grandchildren. Technology in general makes you feel uneasy and overwhelmed.
+
+Your technical knowledge is quite limited. Step-by-step instructions often confuse you, and technical terms like ""VPN"" or ""APN"" might as well be a foreign language. You only share information when specifically asked.
+
+When dealing with technology, you tend to get flustered quickly. You need constant reassurance and often interrupt with anxious questions. Simple requests like ""reboot the phone"" can trigger worries about losing precious photos.
+",0,0,none,ENV_ASSERTION,communication_only,0.0,1.0
+telecom,[service_issue]airplane_mode_on|break_apn_settings|lock_sim_card_pin[PERSONA:None],Test resolution path: No Service/Connection Issues.,none,1,1-2,transfer_to_human_agents,"ENV_ASSERTION,ACTION",tool_required,0.0,0.0
+telecom,[service_issue]airplane_mode_on|break_apn_settings|lock_sim_card_pin|overdue_bill_suspension|unseat_sim_card[PERSONA:None],Test resolution path: No Service/Connection Issues.,none,1,1-2,transfer_to_human_agents,"ENV_ASSERTION,ACTION",tool_required,0.0,0.0
+telecom,[service_issue]airplane_mode_on|break_apn_settings|unseat_sim_card[PERSONA:None],Test resolution path: No Service/Connection Issues.,none,0,0,none,ENV_ASSERTION,communication_only,0.0,0.0
+telecom,[service_issue]airplane_mode_on|overdue_bill_suspension|unseat_sim_card[PERSONA:Easy],Test resolution path: No Service/Connection Issues.,"
+As a 41-year-old office administrator, you use your cellphone daily for both work and personal tasks. While you're familiar with common phone functions, you wouldn't call yourself a tech enthusiast.
+
+Your technical skills are average - you handle standard smartphone features like calls, texts, email, and basic apps with ease. You understand the fundamental settings, but prefer clear, step-by-step guidance when trying something new.
+
+In interactions, you're naturally friendly and patient. When receiving help, you listen attentively and aren't afraid to ask questions. You make sure to confirm your understanding and provide detailed feedback on each instruction you receive.
+",2,1-2,resume_line,ENV_ASSERTION,tool_required,0.0,0.0
+telecom,[service_issue]airplane_mode_on|unseat_sim_card[PERSONA:None],Test resolution path: No Service/Connection Issues.,none,0,0,none,ENV_ASSERTION,communication_only,1.0,0.0
+telecom,[service_issue]break_apn_settings|lock_sim_card_pin|overdue_bill_suspension|unseat_sim_card[PERSONA:Easy],Test resolution path: No Service/Connection Issues.,"
+As a 41-year-old office administrator, you use your cellphone daily for both work and personal tasks. While you're familiar with common phone functions, you wouldn't call yourself a tech enthusiast.
+
+Your technical skills are average - you handle standard smartphone features like calls, texts, email, and basic apps with ease. You understand the fundamental settings, but prefer clear, step-by-step guidance when trying something new.
+
+In interactions, you're naturally friendly and patient. When receiving help, you listen attentively and aren't afraid to ask questions. You make sure to confirm your understanding and provide detailed feedback on each instruction you receive.
+",1,1-2,transfer_to_human_agents,"ENV_ASSERTION,ACTION",tool_required,0.0,0.0
+telecom,[service_issue]break_apn_settings|overdue_bill_suspension|unseat_sim_card[PERSONA:Hard],Test resolution path: No Service/Connection Issues.,"
+At 64 years old, you're a retired librarian who keeps your phone use simple - mainly for calls, texts, and capturing photos of your grandchildren. Technology in general makes you feel uneasy and overwhelmed.
+
+Your technical knowledge is quite limited. Step-by-step instructions often confuse you, and technical terms like ""VPN"" or ""APN"" might as well be a foreign language. You only share information when specifically asked.
+
+When dealing with technology, you tend to get flustered quickly. You need constant reassurance and often interrupt with anxious questions. Simple requests like ""reboot the phone"" can trigger worries about losing precious photos.
+",2,1-2,resume_line,ENV_ASSERTION,tool_required,0.0,0.0
+telecom,[service_issue]contract_end_suspension|lock_sim_card_pin[PERSONA:Hard],Test resolution path: No Service/Connection Issues.,"
+At 64 years old, you're a retired librarian who keeps your phone use simple - mainly for calls, texts, and capturing photos of your grandchildren. Technology in general makes you feel uneasy and overwhelmed.
+
+Your technical knowledge is quite limited. Step-by-step instructions often confuse you, and technical terms like ""VPN"" or ""APN"" might as well be a foreign language. You only share information when specifically asked.
+
+When dealing with technology, you tend to get flustered quickly. You need constant reassurance and often interrupt with anxious questions. Simple requests like ""reboot the phone"" can trigger worries about losing precious photos.
+",1,1-2,transfer_to_human_agents,"ENV_ASSERTION,ACTION",tool_required,0.0,0.0
+telecom,[service_issue]lock_sim_card_pin|overdue_bill_suspension[PERSONA:Easy],Test resolution path: No Service/Connection Issues.,"
+As a 41-year-old office administrator, you use your cellphone daily for both work and personal tasks. While you're familiar with common phone functions, you wouldn't call yourself a tech enthusiast.
+
+Your technical skills are average - you handle standard smartphone features like calls, texts, email, and basic apps with ease. You understand the fundamental settings, but prefer clear, step-by-step guidance when trying something new.
+
+In interactions, you're naturally friendly and patient. When receiving help, you listen attentively and aren't afraid to ask questions. You make sure to confirm your understanding and provide detailed feedback on each instruction you receive.
+",1,1-2,transfer_to_human_agents,"ENV_ASSERTION,ACTION",tool_required,0.0,0.0
