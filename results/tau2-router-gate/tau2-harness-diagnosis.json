@@ -1,0 +1,93 @@
+{
+  "scope": "tau2_harness_and_offline_learnability_diagnosis",
+  "created": "2026-08-07",
+  "conclusion": "harness_format_mismatch_plus_model_generation_degeneration",
+  "fork": "stop_tau2_routing_main_experiment__migrate_to_intercode_sql",
+  "harness_config": {
+    "benchmark": "tau2-bench",
+    "repository_revision": "0ed2fd8d830a20657d89ae9c2efcc94838aa7129",
+    "domains": ["airline", "retail", "telecom"],
+    "text_mode_only": true,
+    "max_steps": 100,
+    "max_errors": 10,
+    "agent_prompt": "official_tau2_text_json_schema_plus_domain_policy",
+    "tool_source": "official environment.get_tools() openai_schema",
+    "user_simulator": "official_tau2_user_simulator_deepseek_deterministic_seed300_t0",
+    "generation": {
+      "model_pair": {"edge": "google/gemma-4-E4B-it", "cloud": "google/gemma-4-12b-it"},
+      "quantization": "bnb_4bit_nf4",
+      "dtype": "bfloat16",
+      "do_sample": false,
+      "max_new_tokens": 1024,
+      "both_arms_4bit_fair_for_routing": true
+    }
+  },
+  "tool_feedback_verification": {
+    "finding": "tool_results_are_fed_back_correctly",
+    "evidence": "prompt_hash changes across repeated steps (7 distinct in 8 normal steps); prompt_tokens grows 4465->4499; model still emits byte-identical response_hash",
+    "harness_bug": false
+  },
+  "per_arm_generation_behavior": {
+    "edge": {
+      "model": "google/gemma-4-E4B-it",
+      "n_episodes": 125,
+      "steps": 4453,
+      "structured_tool_fraction": 0.798,
+      "non_structured_recovery_fraction": 0.202,
+      "episodes_with_ge5_identical_consecutive_actions": 96,
+      "fraction_episodes_with_ge5_identical": 0.768,
+      "mean_max_consecutive_identical_run": 27.8,
+      "max_steps_termination": 50,
+      "consecutive_identical_response_fraction": 0.771,
+      "unbalanced_quote_truncation_fraction": 0.853,
+      "tool_errors": 36,
+      "diagnosis": "format_followed_but_generation_degenerates_into_repetition_loops__quantization_or_architecture_anomaly"
+    },
+    "cloud": {
+      "model": "google/gemma-4-12b-it",
+      "n_episodes": 125,
+      "steps": 1310,
+      "structured_tool_fraction": 0.0,
+      "non_structured_recovery_fraction": 1.0,
+      "episodes_with_ge5_identical_consecutive_actions": 2,
+      "fraction_episodes_with_ge5_identical": 0.016,
+      "mean_max_consecutive_identical_run": 1.2,
+      "max_steps_termination": 1,
+      "consecutive_identical_response_fraction": 0.023,
+      "unbalanced_quote_truncation_fraction": 0.062,
+      "tool_errors": 0,
+      "diagnosis": "never_emits_structured_tool_call__chat_only__does_not_follow_text_json_tool_schema"
+    }
+  },
+  "success_rates": {
+    "train": {"edge": 0.088, "cloud": 0.136, "oracle": 0.144},
+    "dev": {"edge": 0.094, "cloud": 0.094, "oracle": 0.113}
+  },
+  "offline_learnability_oof": {
+    "n_train_tasks": 125,
+    "non_tie_tasks": 8,
+    "bidirectional_exclusive": {"cloud_better": 7, "edge_better": 1, "tie": 117},
+    "oracle_gap_pp": 0.8,
+    "best_router_oracle_capture": 0.0,
+    "permutation_baseline_capture_mean": -2.4,
+    "conclusion": "reward_signal_too_sparse__no_router_learns"
+  },
+  "decision": {
+    "harness_parser_recovery_ok": true,
+    "parser_tool_error_dominant": false,
+    "harness_format_mismatch_dominant": true,
+    "adapter_fix_would_recover_capability": false,
+    "e4b_fp16_re_run_required": false,
+    "e4b_fp16_re_run_reason": "both_arms_4bit_is_fair_for_routing; E4B repetition is a model/quantization generation anomaly, not a routing-fairness issue; regenerating train/dev would not change the sparsity or the oracle gap",
+    "train_oof_oracle_capture_ge_03": false,
+    "oracle_gap_ge_3pp": false,
+    "official_test": "blocked",
+    "full_baselines": "blocked",
+    "paper_drafting": "blocked",
+    "action": "stop expanding tau2 routing main experiment; retain tau2 as hard-environment / failure-analysis / generalization-validation; migrate primary routing experiment to a deterministic high-success-rate dataset (InterCode-SQL)"
+  },
+  "claims_status": {
+    "c1_c2_c4": "not_deprecated",
+    "c3_reward_aware_routing": "blocked_on_tau2_sparsity"
+  }
+}
