@@ -1,0 +1,56 @@
+{
+  "config_hash": "46ee0b1971301cde6a6d30ba1596b5d6114d543202b3346b9b8f344c9f694879",
+  "held_out_test_accessed_for_router": false,
+  "model_ids": {
+    "cloud": "google/gemma-4-12b-it",
+    "edge": "google/gemma-4-E4B-it"
+  },
+  "model_precisions": {
+    "cloud": {
+      "dtype": "bfloat16",
+      "quantization": "bnb_4bit"
+    },
+    "edge": {
+      "dtype": "bfloat16",
+      "quantization": "bnb_4bit"
+    }
+  },
+  "model_revisions": {
+    "cloud": "a69a4a15fe6a1b5a51373df662c1472be9b67683",
+    "edge": "da2249f601f308b930979e20827bb464761fed65"
+  },
+  "modelscope_version": "1.39.1",
+  "software_only": false,
+  "tau2_counts": {
+    "airline": {
+      "test": 20,
+      "train": 30
+    },
+    "retail": {
+      "test": 40,
+      "train": 74
+    },
+    "telecom": {
+      "test": 40,
+      "train": 74
+    }
+  },
+  "tau2_repository": {
+    "origin": "https://github.com/sierra-research/tau2-bench.git",
+    "path": "/root/autodl-tmp/AgentRelay/repositories/tau2-bench",
+    "revision": "0ed2fd8d830a20657d89ae9c2efcc94838aa7129"
+  },
+  "user_simulator": {
+    "api_key_env": "DEEPSEEK_API_KEY",
+    "api_key_present": true,
+    "benchmark_revision": "0ed2fd8d830a20657d89ae9c2efcc94838aa7129",
+    "config_hash": "d3fe758677a314335bbad48f2bf1038f5111a2bdda87c8015a3b6d78ad635bb6",
+    "implementation": "official_tau2_user_simulator",
+    "max_tokens": 512,
+    "model": "deepseek/deepseek-v4-flash",
+    "model_revision": "deepseek-v4-flash",
+    "prompt_policy": "official_tau2_v0.2.1_unmodified",
+    "seed": 300,
+    "temperature": 0.0
+  }
+}

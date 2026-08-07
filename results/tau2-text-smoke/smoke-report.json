@@ -1,0 +1,1 @@
+{"cloud_mean_reward":0.3333333333333333,"domains":["airline","retail","telecom"],"edge_mean_reward":0.3333333333333333,"paired_tasks":3,"paper_evidence":false,"report_hash":"8feb65902e99e17b668b187b76ba2a8c78f1149fb39ddc7e542157faa1fac1d7","rows_hash":"8c34bc035e0cf691a9248840ee8aeec90f787f24e297a84d66db071e84ab3de4","scope":"tau2_three_domain_text_smoke"}

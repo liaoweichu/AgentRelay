@@ -142,7 +142,7 @@ class Tau2AdapterTests(unittest.TestCase):
         config = Tau2UserSimulatorConfig.load(path, require_secret=False)
         self.assertEqual(config.temperature, 0.0)
         self.assertEqual(config.benchmark_revision, TAU2_PINNED_REVISION)
-        self.assertEqual(raw["api_key_env"], "OPENAI_API_KEY")
+        self.assertEqual(raw["api_key_env"], "DEEPSEEK_API_KEY")
         self.assertNotIn("api_key", raw)
 
     def test_resume_is_scoped_and_hash_checked(self) -> None:

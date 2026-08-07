@@ -400,6 +400,7 @@ class NativeTau2Agent:
         self.executor = executor
         self.profile = profile
         self.max_steps = max_steps
+        self._generation_retries = 4
         self.generation_trace: list[dict[str, Any]] = []
         self.first_router_features: dict[str, float] | None = None
 
@@ -451,8 +452,41 @@ class NativeTau2Agent:
             )
         messages = [{"role": "system", "content": self.system_prompt}]
         messages.extend(_chat_message(item) for item in state)
-        started = time.perf_counter()
-        result: NativeGenerationResult = self.executor.generate(messages)
+        # The endpoint occasionally decodes an empty stub (only whitespace). The
+        # edge Gemma decode is greedy, so retrying the identical prompt is
+        # deterministic; we still bounded-retry to ride out any non-reproducible
+        # stub, then fall back to a recovery message instead of crashing.
+        result: NativeGenerationResult | None = None
+        for _attempt in range(self._generation_retries):
+            started = time.perf_counter()
+            candidate = self.executor.generate(messages)
+            if candidate.text.strip():
+                result = candidate
+                break
+        if result is None:
+            fallback_text = (
+                "I understand; let me continue working on this. Could you "
+                "confirm the next detail so I can proceed?"
+            )
+            assistant = AssistantMessage(role="assistant", content=fallback_text)
+            state.append(assistant)
+            self.generation_trace.append(
+                {
+                    "model_id": self.executor.config.model_id,
+                    "model_revision": self.executor.config.revision,
+                    "action_recovery": "empty_response_fallback",
+                    "action_text": fallback_text,
+                    "prompt_hash": sha256_text(canonical_json(messages)),
+                    "response_hash": sha256_text(fallback_text),
+                    "controller_ms": 0.0,
+                    "latency_ms": 0.0,
+                    "output_tokens": 0,
+                    "prompt_tokens": 0,
+                    "peak_cuda_memory_bytes": 0,
+                    "seed": self.executor.config.seed,
+                }
+            )
+            return assistant, state
         controller_ms = (time.perf_counter() - started) * 1000.0 - result.latency_ms
         parsed = parse_tau2_action(result.text, allowed_tools=(tool.name for tool in self.tools))
         if parsed.tool_name is not None:
@@ -482,6 +516,122 @@ class NativeTau2Agent:
         return assistant, state
 
 
+class _UserSimMemoryCache:
+    """Small on-disk JSON cache that pins the user simulator's step-zero message."""
+
+    def __init__(self, path: str | Path) -> None:
+        self.path = Path(path)
+        self.records: dict[str, Any] = {}
+        if self.path.exists():
+            try:
+                self.records = json.loads(self.path.read_text(encoding="utf-8"))
+            except (json.JSONDecodeError, OSError):
+                self.records = {}
+
+    def get(self, key: str) -> dict[str, Any] | None:
+        return self.records.get(key)
+
+    def set(self, key: str, record: dict[str, Any]) -> None:
+        self.records[key] = record
+        temporary = self.path.with_suffix(self.path.suffix + ".tmp")
+        temporary.write_text(json.dumps(self.records, sort_keys=True), encoding="utf-8")
+        temporary.replace(self.path)
+
+
+class _DeterministicUserSimulator:
+    """Delegate to the official tau2 UserSimulator but cache and replay its FIRST
+    generated user message, so paired edge/cloud runs observe an identical
+    step-zero input even when the LLM backend is not deterministic (DeepSeek)."""
+
+    def __init__(self, inner: Any, cache: _UserSimMemoryCache, cache_key: str) -> None:
+        self._inner = inner
+        self._cache = cache
+        self._cache_key = cache_key
+        self._generation = 0
+        self._max_attempts = 10
+
+    def get_init_state(self, *args: Any, **kwargs: Any) -> Any:
+        return self._inner.get_init_state(*args, **kwargs)
+
+    def stop(self, *args: Any, **kwargs: Any) -> Any:
+        return self._inner.stop(*args, **kwargs)
+
+    def __getattr__(self, name: str) -> Any:
+        # Delegate any other user-simulator API (e.g. set_seed) to the inner
+        # official implementation so the orchestrator interface is unchanged.
+        return getattr(self._inner, name)
+
+    def generate_next_message(self, message: Any, state: Any) -> tuple[Any, Any]:
+        if self._generation == 0:
+            cached = self._cache.get(self._cache_key)
+            if cached is not None:
+                from tau2.data_model.message import MultiToolMessage, ToolCall, UserMessage
+
+                if isinstance(message, MultiToolMessage):
+                    state.messages.extend(message.tool_messages)
+                else:
+                    state.messages.append(message)
+                cached_calls = cached.get("tool_calls") or []
+                user_message = UserMessage(
+                    role="user",
+                    content=cached["content"],
+                    tool_calls=(
+                        [
+                            ToolCall(
+                                id=tc["id"],
+                                name=tc["name"],
+                                arguments=tc["arguments"],
+                                requestor="user",
+                            )
+                            for tc in cached_calls
+                        ]
+                        if cached_calls
+                        else None
+                    ),
+                )
+                state.messages.append(user_message)
+                self._generation += 1
+                return user_message, state
+        snapshot_len = len(state.messages)
+        result = self._inner.generate_next_message(message, state)
+        user_message, _ = result
+        attempt = 0
+        while not (user_message.has_text_content() or user_message.is_tool_call()):
+            attempt += 1
+            if attempt >= self._max_attempts:
+                # DeepSeek can transiently refuse for a whole turn; fall back to a
+                # benign user continuation rather than crashing the episode. The
+                # step-zero fallback is still cached so paired edge/cloud runs
+                # observe an identical visible input.
+                from tau2.data_model.message import UserMessage
+
+                user_message = UserMessage(
+                    role="user",
+                    content="I understand. Please continue and let me know what you need from me.",
+                )
+                state.messages.append(user_message)
+                break
+            # The inner simulator appended the empty response to the shared state;
+            # restore the history to just before the call, then retry.
+            del state.messages[snapshot_len:]
+            time.sleep(1.0)
+            result = self._inner.generate_next_message(message, state)
+            user_message, _ = result
+        if self._generation == 0:
+            self._cache.set(
+                self._cache_key,
+                {
+                    "content": user_message.content,
+                    "tool_calls": [
+                        {"id": tc.id, "name": tc.name, "arguments": tc.arguments}
+                        for tc in (user_message.tool_calls or [])
+                    ],
+                },
+            )
+        self._generation += 1
+        return user_message, state
+
+
 class Tau2Adapter:
     """Run one official tau2 task and convert it to router-compatible evidence."""
 
@@ -492,12 +642,16 @@ class Tau2Adapter:
         *,
         max_steps: int = 100,
         max_errors: int = 10,
+        user_sim_cache_path: str | Path | None = None,
     ) -> None:
         self.repository_info = verify_tau2_repository(repository)
         activate_tau2_repository(repository)
         self.user_config = user_config
         self.max_steps = max_steps
         self.max_errors = max_errors
+        self.user_sim_cache = (
+            _UserSimMemoryCache(user_sim_cache_path) if user_sim_cache_path else None
+        )
 
     def run(
         self,
@@ -535,13 +689,24 @@ class Tau2Adapter:
             profile=profile,
             max_steps=self.max_steps,
         )
-        user_tools = environment.get_user_tools()
+        try:
+            user_tools = environment.get_user_tools()
+        except ValueError:
+            # Mirror the official tau2 run.py, which tolerates domains (e.g.
+            # airline) that expose no user tools to the user simulator.
+            user_tools = None
         user = UserSimulator(
             tools=user_tools,
             instructions=str(task.user_scenario),
             llm=self.user_config.model,
             llm_args=self.user_config.llm_args(),
         )
+        if self.user_sim_cache is not None:
+            user = _DeterministicUserSimulator(
+                user,
+                self.user_sim_cache,
+                f"{task_ref.domain}|{task_ref.task_id}",
+            )
         orchestrator = Orchestrator(
             domain=task_ref.domain,
             agent=agent,

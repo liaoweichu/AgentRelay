@@ -8,3 +8,12 @@ artifacts/local-data/datasets/
 artifacts/local-data/models/
 dist/
 repositories/
+
+# Cloud run artifacts (root-layout): model weights, venvs, caches, datasets
+models/
+venv/
+.venv/
+cache/
+datasets/
+runs/
+*.log

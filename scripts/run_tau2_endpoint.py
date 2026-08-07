@@ -171,7 +171,11 @@ def main() -> int:
 
     storage = StorageLayout(Path(config["data_root"]).resolve())
     executor = HFModelExecutor(model_config, storage)
-    adapter = Tau2Adapter(args.tau2_repository, user)
+    adapter = Tau2Adapter(
+        args.tau2_repository,
+        user,
+        user_sim_cache_path=Path(args.output_dir).resolve().parent / "user-sim-cache.json",
+    )
     run_id = f"tau2-{context['split']}-{args.role}-{context_hash[:12]}"
     endpoint_provenance = {
         "run_id": run_id,

@@ -1,0 +1,17 @@
+{
+  "config": "/root/autodl-tmp/AgentRelay/formal-autodl-4090d.locked.json",
+  "cuda": "12.8",
+  "data_root": "/root/autodl-tmp/AgentRelay",
+  "datasets": "4.8.5",
+  "disk_free_bytes": 28017446912,
+  "disk_total_bytes": 128849018880,
+  "disk_used_bytes": 100831571968,
+  "gpu": "NVIDIA GeForce RTX 4090 D",
+  "gpu_total_memory_bytes": 25250627584,
+  "mode": "formal_autodl",
+  "paper_evidence": true,
+  "platform": "Linux-5.15.0-94-generic-x86_64-with-glibc2.35",
+  "python": "3.12.3",
+  "torch": "2.11.0+cu128",
+  "transformers": "5.10.1"
+}
