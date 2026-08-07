@@ -12,8 +12,9 @@ Gate metrics (mirroring the tau2 fork decision):
   - per-arm duplicate-loop rate (no large identical-action loops)
   - per-arm success rate (reward == 1.0), non-zero and non-saturated
   - bidirectional exclusive wins
-  - oracle gap (12B - E4B success), target >= 3-5 pp
-  - non-tie task count (sufficient for OOF, not single digits)
+  - oracle-minus-best-fixed success gap, target >= 3-5 pp
+  - continuous-reward non-tie task count (sufficient for OOF, not single digits)
+  - official submit termination rate (including strict atomic SQL-plus-submit)
 
 Only after the gate passes may the full train/dev endpoint matrix be built.
 The official Spider test split is sealed and never used here.
@@ -22,23 +23,29 @@ The official Spider test split is sealed and never used here.
 from __future__ import annotations
 
 import argparse
+import csv
 import json
-import os
-import random
-import re
+import math
 import sys
+import time
 from collections import Counter
+from contextlib import suppress
+from io import StringIO
 from itertools import chain, groupby
 from operator import itemgetter
 from pathlib import Path
-from typing import Any
 
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(PROJECT_ROOT / "src"))
 
-from agentrelay.inference import HFModelExecutor, NativeGenerationConfig  # noqa: E402
-from agentrelay.config import StorageLayout  # noqa: E402
-from agentrelay.schema import canonical_json, sha256_json  # noqa: E402
+from agentrelay.config import StorageLayout
+from agentrelay.inference import HFModelExecutor, NativeGenerationConfig
+from agentrelay.intercode_sql import (
+    paired_reward_summary,
+    parse_sql_action,
+    proportional_stratified_indices,
+)
+from agentrelay.schema import canonical_json, sha256_json
 
 SPIDER_DEV = PROJECT_ROOT / "repositories/InterCode/data/sql/spider/ic_spider_dev.json"
 SPIDER_DBS = PROJECT_ROOT / "repositories/InterCode/data/sql/spider/ic_spider_dbs.sql"
@@ -53,10 +60,6 @@ MODEL_REVISIONS = {
         "revision": "a69a4a15fe6a1b5a51373df662c1472be9b67683",
     },
 }
-
-THINK_STRIP = re.compile(r"<thinking>.*?</thinking>", re.DOTALL)
-CODE_BLOCK = re.compile(r"```(?:sql)?\s*(.*?)```", re.DOTALL)
-
 
 def _iou_reward(agent_rows, gold_rows):
     """Exact InterCode SqlEnv reward: row IoU scaled by sort correlation."""
@@ -97,7 +100,7 @@ def _iou_reward(agent_rows, gold_rows):
                 corr = kendalltau(agent_intx, eval_intx, nan_policy="omit").statistic
             except (TypeError, ValueError):
                 corr = 1.0
-            if corr == corr and corr is not None:  # not NaN
+            if corr is not None and not math.isnan(corr):
                 reward = round(corr * reward, 2)
     return reward
 
@@ -108,7 +111,8 @@ class SqlExecutor:
     def __init__(self, host="127.0.0.1", port=3306, user="admin", password="admin"):
         import mysql.connector
         self._ctor = mysql.connector.connect
-        self._cfg = dict(host=host, port=port, user=user, password=password)
+        self._error_type = mysql.connector.Error
+        self._cfg = {"host": host, "port": port, "user": user, "password": password}
         self._conn = None
 
     def _ensure(self):
@@ -127,13 +131,11 @@ class SqlExecutor:
             cur.execute(sql)
             if cur.description is not None:
                 rows = cur.fetchall()
-        except Exception as exc:
+        except self._error_type as exc:
             error = str(exc)
         finally:
-            try:
+            with suppress(self._error_type):
                 cur.close()
-            except Exception:
-                pass
         return rows, error
 
     def gold_rows(self, db, gold_sql):
@@ -157,51 +159,22 @@ Rules:
 
 
 def _extract_action(text):
-    """Return ('submit', None) or ('sql', statement) from a model response.
+    """Compatibility wrapper around the tested shared protocol parser."""
 
-    If a SQL code block is present, execute it even if the model also wrote
-    ``submit`` (Gemma 4 models tend to emit ``sql`` then ``submit`` in the same
-    turn; the SQL block is the intended answer query).  A bare ``submit`` with
-    no SQL is the real submit action.
-    """
-    stripped = THINK_STRIP.sub("", text or "").strip()
-    m = CODE_BLOCK.search(stripped)
-    if m:
-        sql = m.group(1).strip().rstrip(";")
-        if sql and sql.upper() != "SUBMIT":
-            return "sql", sql
-    if re.search(r"\bsubmit\b", stripped, re.IGNORECASE):
-        return "submit", None
-    # Fallback: last line that looks like SQL
-    lines = [ln.strip() for ln in stripped.splitlines() if ln.strip()]
-    for ln in reversed(lines):
-        head = ln.lstrip().upper()
-        if head.startswith(("SELECT", "SHOW", "DESC", "DESCRIBE", "WITH", "EXPLAIN")):
-            return "sql", ln.rstrip(";")
-    return None, None
+    parsed = parse_sql_action(text)
+    return parsed.kind, parsed.sql
 
 
 def _build_task_list(n_tasks, seed):
     data = json.loads(Path(SPIDER_DEV).read_text(encoding="utf-8"))
-    rng = random.Random(seed)
-    # Stratify across hardness bins to keep the 50-task subset representative.
-    by_hardness = {}
-    for idx, rec in enumerate(data):
-        by_hardness.setdefault(rec.get("hardness", "unknown"), []).append(idx)
-    selected = []
-    buckets = sorted(by_hardness)
-    # round-robin across hardness buckets
-    max_len = max(len(v) for v in by_hardness.values())
-    for round_idx in range(max_len):
-        for b in buckets:
-            bucket = by_hardness[b]
-            if round_idx < len(bucket):
-                selected.append(bucket[round_idx])
-        if len(selected) >= n_tasks:
-            break
-    selected = selected[:n_tasks]
-    rng.shuffle(selected)
-    return [data[i] for i in selected], selected
+    selected = proportional_stratified_indices(
+        data,
+        n_samples=n_tasks,
+        seed=seed,
+        field="hardness",
+    )
+    tasks = [{**data[index], "_selection_index": index} for index in selected]
+    return tasks, selected
 
 
 # Cap the observation fed back to the model so the multi-step interaction loop
@@ -246,6 +219,16 @@ def _run_episode(executor, model, task, max_steps):
     last_obs_str = None
     reward = 0.0
     done = False
+    termination = "max_steps_without_submit"
+    evaluation_latency_ms = 0.0
+
+    def score(rows):
+        nonlocal evaluation_latency_ms
+        started = time.perf_counter()
+        value = _iou_reward(rows, executor.gold_rows(db, gold))
+        evaluation_latency_ms += (time.perf_counter() - started) * 1000.0
+        return value
+
     for step in range(max_steps):
         result = model.generate(messages)
         text = result.text
@@ -256,16 +239,20 @@ def _run_episode(executor, model, task, max_steps):
             "raw": text,
             "prompt_hash": result.prompt_hash,
             "response_hash": result.response_hash,
+            "prompt_tokens": result.prompt_tokens,
             "output_tokens": result.output_tokens,
+            "latency_ms": result.latency_ms,
+            "peak_cuda_memory_bytes": result.peak_cuda_memory_bytes,
         }
         if kind == "submit":
             action["sql"] = None
-            reward = _iou_reward(last_obs, executor.gold_rows(db, gold))
+            reward = score(last_obs)
             action.update({"observation": _truncate_obs(last_obs_str), "reward": reward})
             actions.append(action)
             done = True
+            termination = "standalone_submit"
             break
-        if kind == "sql":
+        if kind in {"sql", "sql_submit"}:
             action["sql"] = sql
         else:
             action.update({"error": "unparseable", "observation": None})
@@ -280,7 +267,9 @@ def _run_episode(executor, model, task, max_steps):
             )
             continue
         # execute sql
+        exec_started = time.perf_counter()
         rows, error = executor.run(db, sql)
+        exec_latency_ms = (time.perf_counter() - exec_started) * 1000.0
         if error is not None:
             obs_str = f"Error executing query: {error}"
             last_obs = None
@@ -288,7 +277,20 @@ def _run_episode(executor, model, task, max_steps):
             last_obs = rows
             obs_str = str(rows) if rows is not None else "Success (no rows)"
         last_obs_str = obs_str
-        action.update({"observation": _truncate_obs(obs_str), "exec_error": error is not None})
+        action.update(
+            {
+                "observation": _truncate_obs(obs_str),
+                "exec_error": error is not None,
+                "exec_latency_ms": exec_latency_ms,
+            }
+        )
+        if kind == "sql_submit":
+            reward = score(last_obs)
+            action["reward"] = reward
+            actions.append(action)
+            done = True
+            termination = "combined_sql_submit"
+            break
         actions.append(action)
         messages.append({"role": "assistant", "content": text})
         messages.append(
@@ -297,8 +299,13 @@ def _run_episode(executor, model, task, max_steps):
                 "content": f"SQL Output: {_truncate_obs(obs_str)}\n\nContinue. Output another ```sql block or `submit` if correct.",
             }
         )
-    if not done:
-        reward = _iou_reward(last_obs, executor.gold_rows(db, gold))
+    if done:
+        last_query_reward = reward
+    else:
+        last_query_reward = score(last_obs)
+        # Official InterCode returns task reward only after a submit action.
+        # Retain the last-query score solely as a diagnostic signal.
+        reward = 0.0
     # duplicate-loop detection: count max run of identical sql actions
     sql_seq = [a.get("sql") for a in actions if a.get("kind") == "sql"]
     max_run = 0
@@ -315,11 +322,20 @@ def _run_episode(executor, model, task, max_steps):
         "query": query,
         "gold": gold,
         "task_id": task.get("id", f"{db}-{query}"),
+        "task_index": task.get("_selection_index"),
+        "hardness": task.get("hardness", "unknown"),
         "reward": float(reward),
+        "last_query_reward": float(last_query_reward),
         "success": float(reward >= 0.999),
+        "termination": termination,
         "max_duplicate_run": max_run,
         "n_sql_actions": len(sql_seq),
         "n_steps": len(actions),
+        "model_latency_ms": sum(float(action["latency_ms"]) for action in actions),
+        "sql_execution_latency_ms": sum(
+            float(action.get("exec_latency_ms", 0.0)) for action in actions
+        ),
+        "evaluation_latency_ms": evaluation_latency_ms,
         "actions": actions,
     }
 
@@ -336,7 +352,7 @@ def _emit_provenance():
             .decode()
             .strip()
         )
-    except Exception:
+    except (OSError, subprocess.CalledProcessError):
         code_rev = "unknown"
     return {
         "code_revision": code_rev,
@@ -370,11 +386,11 @@ def main() -> int:
     tasks, selected_idx = _build_task_list(args.n_tasks, args.seed)
     if args.edges_only_smoke:
         tasks = tasks[:2]
+        selected_idx = selected_idx[:2]
         args.max_steps = 4
 
     # Deterministic model order; load one at a time to bound memory.
     episodes = {}
-    manifest = []
     for role in ("edge", "cloud"):
         cfg = MODEL_REVISIONS[role]
         ngen = NativeGenerationConfig(
@@ -415,24 +431,49 @@ def main() -> int:
         success = sum(e["success"] for e in eps) / n
         parse_ok = sum(1 for e in eps if e["n_sql_actions"] > 0) / n
         loop = sum(1 for e in eps if e["max_duplicate_run"] >= 4) / n
+        submitted = sum(
+            1
+            for e in eps
+            if e["termination"] in {"standalone_submit", "combined_sql_submit"}
+        ) / n
+        combined = sum(1 for e in eps if e["termination"] == "combined_sql_submit") / n
+        max_steps = sum(1 for e in eps if e["termination"] == "max_steps_without_submit") / n
         return {
             "n": n,
             "success_rate": round(success, 4),
             "parse_rate": round(parse_ok, 4),
+            "submission_rate": round(submitted, 4),
+            "combined_submit_rate": round(combined, 4),
+            "max_steps_without_submit_rate": round(max_steps, 4),
             "duplicate_loop_rate": round(loop, 4),
             "mean_max_duplicate_run": round(sum(e["max_duplicate_run"] for e in eps) / n, 2),
             "mean_steps": round(sum(e["n_steps"] for e in eps) / n, 2),
+            "mean_model_latency_ms": round(sum(e["model_latency_ms"] for e in eps) / n, 2),
+            "mean_sql_execution_latency_ms": round(
+                sum(e["sql_execution_latency_ms"] for e in eps) / n, 2
+            ),
+            "mean_prompt_tokens": round(
+                sum(sum(a["prompt_tokens"] for a in e["actions"]) for e in eps) / n, 2
+            ),
+            "mean_output_tokens": round(
+                sum(sum(a["output_tokens"] for a in e["actions"]) for e in eps) / n, 2
+            ),
+            "peak_cuda_memory_bytes": max(
+                a["peak_cuda_memory_bytes"] for e in eps for a in e["actions"]
+            ),
         }
 
     edge_stats = arm_stats("edge")
     cloud_stats = arm_stats("cloud")
-    oracle_gap_pp = round((cloud_stats["success_rate"] - edge_stats["success_rate"]) * 100, 2)
 
     # paired / exclusive wins over shared task order
     paired = []
     for e_ep, c_ep in zip(episodes["edge"], episodes["cloud"]):
         paired.append(
             {
+                "task_id": e_ep["task_id"],
+                "task_index": e_ep["task_index"],
+                "hardness": e_ep["hardness"],
                 "query": e_ep["query"],
                 "reward_edge": e_ep["reward"],
                 "reward_cloud": c_ep["reward"],
@@ -440,30 +481,52 @@ def main() -> int:
                 "success_cloud": bool(c_ep["success"]),
             }
         )
-    non_tie = sum(1 for p in paired if p["success_edge"] != p["success_cloud"])
+    success_non_tie = sum(
+        1 for p in paired if p["success_edge"] != p["success_cloud"]
+    )
+    reward_non_tie = sum(
+        1 for p in paired if abs(p["reward_edge"] - p["reward_cloud"]) > 1e-9
+    )
     edge_excl = sum(1 for p in paired if p["success_edge"] and not p["success_cloud"])
     cloud_excl = sum(1 for p in paired if p["success_cloud"] and not p["success_edge"])
     both = sum(1 for p in paired if p["success_edge"] and p["success_cloud"])
+    success_summary = paired_reward_summary(
+        [float(p["success_edge"]) for p in paired],
+        [float(p["success_cloud"]) for p in paired],
+    )
+    reward_summary = paired_reward_summary(
+        [float(p["reward_edge"]) for p in paired],
+        [float(p["reward_cloud"]) for p in paired],
+    )
+    oracle_gap_pp = round(success_summary["oracle_gap"] * 100, 2)
+    checks = {
+        "enough_reward_non_ties": reward_non_tie >= 20,
+        "oracle_gap_ge_3pp": oracle_gap_pp >= 3.0,
+        "edge_success_non_saturated": 0.05 <= edge_stats["success_rate"] <= 0.95,
+        "cloud_success_non_saturated": 0.05 <= cloud_stats["success_rate"] <= 0.95,
+        "edge_parse_rate": edge_stats["parse_rate"] >= 0.5,
+        "cloud_parse_rate": cloud_stats["parse_rate"] >= 0.5,
+        "edge_submission_rate": edge_stats["submission_rate"] >= 0.95,
+        "cloud_submission_rate": cloud_stats["submission_rate"] >= 0.95,
+        "edge_duplicate_loop_rate": edge_stats["duplicate_loop_rate"] <= 0.3,
+        "cloud_duplicate_loop_rate": cloud_stats["duplicate_loop_rate"] <= 0.3,
+        "edge_exclusive_success": edge_excl >= 1,
+        "cloud_exclusive_success": cloud_excl >= 1,
+    }
 
     gate = {
         "scope": "intercode_sql_50task_model_gate",
-        "gate_pass": (
-            non_tie >= 20
-            and oracle_gap_pp >= 3.0
-            and 0.05 <= edge_stats["success_rate"] <= 0.95
-            and 0.05 <= cloud_stats["success_rate"] <= 0.95
-            and edge_stats["parse_rate"] >= 0.5
-            and cloud_stats["parse_rate"] >= 0.5
-            and edge_stats["duplicate_loop_rate"] <= 0.3
-            and cloud_stats["duplicate_loop_rate"] <= 0.3
-            and edge_excl >= 1
-            and cloud_excl >= 1
-        ),
+        "gate_pass": all(checks.values()),
+        "checks": checks,
         "arms": {"edge": edge_stats, "cloud": cloud_stats},
         "oracle_gap_pp": oracle_gap_pp,
+        "success_summary": success_summary,
+        "reward_summary": reward_summary,
         "paired": {
             "n_tasks": len(paired),
-            "non_tie": non_tie,
+            "non_tie": reward_non_tie,
+            "reward_non_tie": reward_non_tie,
+            "success_non_tie": success_non_tie,
             "edge_exclusive": edge_excl,
             "cloud_exclusive": cloud_excl,
             "both_success": both,
@@ -471,7 +534,14 @@ def main() -> int:
         "protocol": "raw_sql_text",
         "official_test_sealed": True,
         "provenance": _emit_provenance(),
-        "task_selection": {"n_tasks": args.n_tasks, "seed": args.seed, "indices": selected_idx},
+        "task_selection": {
+            "n_tasks": len(tasks),
+            "seed": args.seed,
+            "indices": selected_idx,
+            "strategy": "proportional_stratified",
+            "field": "hardness",
+            "hardness_counts": dict(Counter(task.get("hardness", "unknown") for task in tasks)),
+        },
         "episodes_hash_edge": sha256_json(episodes["edge"]),
         "episodes_hash_cloud": sha256_json(episodes["cloud"]),
     }
@@ -485,18 +555,30 @@ def main() -> int:
     (out_dir / "intercode-sql-cloud-episodes.json").write_text(
         canonical_json(episodes["cloud"]) + "\n", encoding="utf-8"
     )
+    csv_buffer = StringIO(newline="")
+    csv_fields = [
+        "task_id",
+        "task_index",
+        "hardness",
+        "query",
+        "reward_edge",
+        "reward_cloud",
+        "success_edge",
+        "success_cloud",
+    ]
+    writer = csv.DictWriter(csv_buffer, fieldnames=csv_fields, lineterminator="\n")
+    writer.writeheader()
+    for row in paired:
+        writer.writerow({field: row[field] for field in csv_fields})
     (out_dir / "intercode-sql-paired.csv").write_text(
-        "query,reward_edge,reward_cloud,success_edge,success_cloud\n"
-        + "\n".join(
-            f"{json.dumps(p['query'])},{p['reward_edge']},{p['reward_cloud']},{int(p['success_edge'])},{int(p['success_cloud'])}"
-            for p in paired
-        )
-        + "\n",
-        encoding="utf-8",
+        csv_buffer.getvalue(), encoding="utf-8"
     )
 
     print(json.dumps(gate, indent=2))
-    print(f"GATE_PASS={gate['gate_pass']}  oracle_gap_pp={oracle_gap_pp} non_tie={non_tie}")
+    print(
+        f"GATE_PASS={gate['gate_pass']} oracle_gap_pp={oracle_gap_pp} "
+        f"reward_non_tie={reward_non_tie}"
+    )
     return 0 if gate["gate_pass"] else 2
 
 

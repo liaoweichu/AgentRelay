@@ -1,18 +1,11 @@
 #!/usr/bin/env python3
-"""Constrained definitive diagnostic: can the cloud (12B-4bit) arm be induced to
-emit a structured protocol action under ANY prompt/adapter variation within the
-allowed lever (prompt only -- model / precision / thinking mode / token budget
-are frozen and NOT varied)?
+"""Constrained diagnostic for cloud-arm InterCode-SQL action formatting.
 
 Motivation
 ----------
-Both tau2 (text-JSON tool-call) and InterCode-SQL (raw-SQL code block) gates
-show the cloud arm failing to emit structured protocol actions (tau2: 0%
-structured tool call; InterCode: parse_rate 0.08) while the edge arm parses at
-1.0 under the identical protocol and prompt.  Because the protocol and prompt
-are shared and only the model differs, the deficit is isolated to the cloud
-model's generation, not the adapter.  This script characterises whether any
-reasonable prompt/adapter form can move the cloud arm off ~0 parse rate.
+This historical diagnostic varies prompt text while freezing the model. The
+shared parser recognizes SQL-only, submit-only, and atomic SQL-plus-submit
+responses so adapter behavior matches the formal gate.
 
 Scope
 -----
@@ -29,16 +22,19 @@ from __future__ import annotations
 
 import argparse
 import json
-import re
 import sys
 from pathlib import Path
 
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(PROJECT_ROOT / "src"))
 
-from agentrelay.inference import HFModelExecutor, NativeGenerationConfig  # noqa: E402
-from agentrelay.config import StorageLayout  # noqa: E402
-from agentrelay.schema import canonical_json, sha256_json  # noqa: E402
+from agentrelay.config import StorageLayout
+from agentrelay.inference import HFModelExecutor, NativeGenerationConfig
+from agentrelay.intercode_sql import (
+    parse_sql_action,
+    proportional_stratified_indices,
+)
+from agentrelay.schema import canonical_json, sha256_json
 
 SPIDER_DEV = PROJECT_ROOT / "repositories/InterCode/data/sql/spider/ic_spider_dev.json"
 
@@ -113,24 +109,12 @@ PROMPT_VARIANTS = {
     "json_sql": JSON_SQL,
 }
 
-THINK_STRIP = re.compile(r"<thinking>.*?</thinking>", re.DOTALL)
-CODE_BLOCK = re.compile(r"```(?:sql)?\s*(.*?)```", re.DOTALL)
-
-
 def _classify(text: str) -> str:
     """Classify a raw single-turn response into an action-emission label."""
-    stripped = THINK_STRIP.sub("", text or "").strip()
-    m = CODE_BLOCK.search(stripped)
-    if m:
-        sql = m.group(1).strip().rstrip(";")
-        if sql and sql.upper() != "SUBMIT":
-            return "sql_code_block"
-    if re.search(r"\bsubmit\b", stripped, re.IGNORECASE):
-        return "submit"
-    for ln in stripped.splitlines():
-        head = ln.lstrip().upper()
-        if head.startswith(("SELECT", "SHOW", "DESC", "DESCRIBE", "WITH", "EXPLAIN")):
-            return "raw_sql_line"
+    parsed = parse_sql_action(text)
+    if parsed.kind != "invalid":
+        return parsed.kind
+    stripped = (text or "").strip()
     # JSON structured probe
     if stripped.lstrip().startswith("{") and ('"sql"' in stripped or '"submit"' in stripped):
         return "json_structured"
@@ -145,25 +129,13 @@ def _schema_str(task) -> str:
 
 
 def _build_tasks(n_tasks, seed):
-    import random
-
     data = json.loads(Path(SPIDER_DEV).read_text(encoding="utf-8"))
-    rng = random.Random(seed)
-    by_hardness = {}
-    for idx, rec in enumerate(data):
-        by_hardness.setdefault(rec.get("hardness", "unknown"), []).append(idx)
-    selected = []
-    buckets = sorted(by_hardness)
-    max_len = max(len(v) for v in by_hardness.values())
-    for round_idx in range(max_len):
-        for b in buckets:
-            bucket = by_hardness[b]
-            if round_idx < len(bucket):
-                selected.append(bucket[round_idx])
-        if len(selected) >= n_tasks:
-            break
-    selected = selected[:n_tasks]
-    rng.shuffle(selected)
+    selected = proportional_stratified_indices(
+        data,
+        n_samples=n_tasks,
+        seed=seed,
+        field="hardness",
+    )
     return [data[i] for i in selected], selected
 
 

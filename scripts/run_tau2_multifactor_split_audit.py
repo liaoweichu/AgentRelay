@@ -26,19 +26,18 @@ from __future__ import annotations
 import argparse
 import csv
 import json
-import re
+import sys
+from collections.abc import Mapping
 from pathlib import Path
-from typing import Any, Mapping
+from typing import Any
 
 import numpy as np
 
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
-import sys
-
 sys.path.insert(0, str(PROJECT_ROOT / "src"))
 
-from agentrelay.router_data import pair_endpoint_episodes  # noqa: E402
-from agentrelay.schema import canonical_json, sha256_json  # noqa: E402
+from agentrelay.router_data import pair_endpoint_episodes
+from agentrelay.schema import canonical_json, sha256_json
 
 TAU2_REPO = PROJECT_ROOT / "repositories" / "tau2-bench"
 DOMAIN_TASK_FILES = {
@@ -86,7 +85,6 @@ def _extract_factors(domain: str, task_id: str) -> dict[str, Any]:
     assistant_actions = [
         a for a in actions if a.get("requestor", "assistant") == "assistant"
     ]
-    communicate = ec.get("communicate_info") or []
     reward_basis = ec.get("reward_basis")
 
     # intent / issue type: prefer description.purpose, else reason_for_call
@@ -99,9 +97,6 @@ def _extract_factors(domain: str, task_id: str) -> dict[str, Any]:
 
     # communication-only vs tool-required
     has_tool = required_action_count > 0
-    has_comm = bool(communicate) or "COMMUNICATE" in (reward_basis or []) or "DB" not in (
-        reward_basis or []
-    )
     role_class = "tool_required" if has_tool else "communication_only"
 
     return {
@@ -183,8 +178,6 @@ def _repeated_stratified_oof(
     from sklearn.pipeline import make_pipeline
     from sklearn.preprocessing import StandardScaler
 
-    from agentrelay.learning import FEATURE_NAMES, feature_vector
-
     rng = np.random.default_rng(seed)
     task_arr = np.asarray(tasks, dtype=object)
     labels = np.asarray([t[stratify_field] for t in tasks])
@@ -222,7 +215,7 @@ def _repeated_stratified_oof(
         "stratify_field": stratify_field,
         "effective_stratify_field": strat,
         "stratify_usable": usable,
-        "n_groups": int(len(groups)),
+        "n_groups": len(groups),
         "n_repeats": n_repeats,
         "n_folds": n_folds,
         "capture_mean": float(np.mean(captures)),
@@ -250,7 +243,7 @@ def _build_feature_matrix(tasks: list[dict]) -> np.ndarray:
     we rebuild them from the same source.  This requires the episode rows; we
     pass them through a module-level slot set by the caller.
     """
-    from agentrelay.learning import FEATURE_NAMES, feature_vector
+    from agentrelay.learning import feature_vector
 
     rows = _FEATURE_ROWS
     features = []
@@ -319,9 +312,6 @@ def main() -> int:
 
     all_rows = train_rows + dev_rows
     tasks = build_tasks(all_rows)
-    train_ids = {t["task_id"] for t in build_tasks(train_rows)}
-    split_tag = ["train" if t["task_id"] in train_ids else "dev" for t in tasks]
-
     # sanity: 178 tasks
     non_tie = sum(1 for t in tasks if t["r_edge"] != t["r_cloud"])
     edge_better = sum(1 for t in tasks if t["r_edge"] > t["r_cloud"])
@@ -337,7 +327,7 @@ def main() -> int:
         "bidirectional_exclusive": {
             "edge_better": edge_better,
             "cloud_better": cloud_better,
-            "tie": non_tie - edge_better - cloud_better,
+            "tie": len(tasks) - non_tie,
         },
         "factor_stats": _factor_stats(tasks),
         "repeated_stratified_oof": {
@@ -374,7 +364,9 @@ def main() -> int:
     )
     csv_path = prefix.with_name("tau2-multifactor-task-factors.csv")
     with csv_path.open("w", newline="", encoding="utf-8") as handle:
-        writer = csv.DictWriter(handle, fieldnames=list(tasks[0].keys()))
+        writer = csv.DictWriter(
+            handle, fieldnames=list(tasks[0].keys()), lineterminator="\n"
+        )
         writer.writeheader()
         for t in tasks:
             writer.writerow(t)
@@ -384,7 +376,7 @@ def main() -> int:
     for field, res in report["repeated_stratified_oof"].items():
         print(
             f"  strat={field:24s} usable={res['stratify_usable']} "
-            f"capture={res['capture_mean']:.3f}±{res['capture_std']:.3f} "
+            f"capture={res['capture_mean']:.3f}+/-{res['capture_std']:.3f} "
             f"(min={res['capture_min']:.3f}, max={res['capture_max']:.3f})"
         )
     print(f"wrote {prefix.parent}/tau2-multifactor-split-audit.json, tau2-multifactor-task-factors.csv")
