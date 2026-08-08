@@ -1,0 +1,1 @@
+{"cloud":{"counts":{"combined_sql_submit":48,"max_steps_without_submit":1,"standalone_submit":1},"rates":{"combined_sql_submit":0.96,"max_steps_without_submit":0.02,"standalone_submit":0.02}},"edge":{"counts":{"standalone_submit":50},"rates":{"standalone_submit":1.0}}}

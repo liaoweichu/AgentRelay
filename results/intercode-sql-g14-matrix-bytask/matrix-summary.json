@@ -1,0 +1,10 @@
+{
+  "mode": "by_task",
+  "dev_dbs": "shared",
+  "dev_fraction": 0.3,
+  "seed": 20260807,
+  "n_train": 220,
+  "n_dev": 94,
+  "n_dbs_train": 20,
+  "n_dbs_dev": 19
+}

@@ -6,6 +6,7 @@ dependencies so the action contract can be tested locally before a cloud run.
 
 from __future__ import annotations
 
+import hashlib
 import math
 import random
 import re
@@ -111,6 +112,44 @@ def proportional_stratified_indices(
     ]
     rng.shuffle(selected)
     return selected
+
+
+_HARDNESS_ORDINAL = {"easy": 0.0, "medium": 1.0, "hard": 2.0, "extra": 3.0}
+
+_DB_HASH_DIMENSIONS = 8
+_DB_HASH_NAMES = tuple(f"db_hash_{index:02d}" for index in range(_DB_HASH_DIMENSIONS))
+
+
+def intercode_task_features(
+    *,
+    db: str,
+    hardness: str,
+    query: str,
+    db_tables: Mapping[str, Sequence[str]] | None = None,
+) -> dict[str, float]:
+    """Pre-action, label-free features that drive the edge/cloud reward router.
+
+    All features are computable before any rollout reward is known: task
+    difficulty label, question surface statistics, schema size, and a stable
+    library identity hash. No feature depends on model output or episode reward.
+    """
+
+    text = query or ""
+    words = [word for word in re.split(r"\s+", text.strip()) if word]
+    db_tables = db_tables or {}
+    n_columns = sum(len(columns) for columns in db_tables.values())
+    features: dict[str, float] = {
+        "hardness_ordinal": float(_HARDNESS_ORDINAL.get(hardness, 1.0)),
+        "query_char_count": float(len(text)),
+        "query_token_count": float(len(words)),
+        "query_numeric_count": float(len(re.findall(r"\d", text))),
+        "n_tables": float(len(db_tables)),
+        "n_columns": float(n_columns),
+    }
+    digest = hashlib.sha256(str(db).encode("utf-8")).digest()
+    for index in range(_DB_HASH_DIMENSIONS):
+        features[_DB_HASH_NAMES[index]] = float(digest[index] / 255.0)
+    return features
 
 
 def paired_reward_summary(

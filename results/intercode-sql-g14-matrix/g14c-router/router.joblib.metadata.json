@@ -1,0 +1,1 @@
+{"executors":["cloud","edge"],"feature_names":["hardness_ordinal","query_char_count","query_token_count","query_numeric_count","n_tables","n_columns","db_hash_00","db_hash_01","db_hash_02","db_hash_03","db_hash_04","db_hash_05","db_hash_06","db_hash_07"],"kind":"intercode_sql_reward_router","model":"per_executor_ridge_reward"}

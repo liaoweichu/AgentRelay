@@ -1,0 +1,113 @@
+{
+  "target": "success",
+  "pool_n": 314,
+  "n_libs": 20,
+  "weighted_mean_capture": 0.16878980891719741,
+  "pooled_router": 0.6656050955414012,
+  "pooled_best_fixed": 0.643312101910828,
+  "pooled_oracle": 0.7356687898089171,
+  "pooled_oracle_gap": 0.09235668789808915,
+  "pooled_capture": 0.2413793103448276,
+  "per_library": {
+    "battle_death": {
+      "n": 2,
+      "oracle_gap": 0.5,
+      "capture": 1.0
+    },
+    "car_1": {
+      "n": 40,
+      "oracle_gap": 0.09999999999999998,
+      "capture": -0.5000000000000003
+    },
+    "concert_singer": {
+      "n": 15,
+      "oracle_gap": 0.0,
+      "capture": 0.0
+    },
+    "course_teach": {
+      "n": 8,
+      "oracle_gap": 0.125,
+      "capture": 1.0
+    },
+    "cre_Doc_Template_Mgt": {
+      "n": 16,
+      "oracle_gap": 0.0,
+      "capture": 0.0
+    },
+    "dog_kennels": {
+      "n": 35,
+      "oracle_gap": 0.02857142857142858,
+      "capture": 1.0
+    },
+    "employee_hire_evaluation": {
+      "n": 13,
+      "oracle_gap": 0.0,
+      "capture": 0.0
+    },
+    "flight_2": {
+      "n": 20,
+      "oracle_gap": 0.15000000000000002,
+      "capture": 0.0
+    },
+    "museum_visit": {
+      "n": 7,
+      "oracle_gap": 0.1428571428571429,
+      "capture": 1.0
+    },
+    "network_1": {
+      "n": 22,
+      "oracle_gap": 0.13636363636363635,
+      "capture": 0.0
+    },
+    "orchestra": {
+      "n": 6,
+      "oracle_gap": 0.0,
+      "capture": 0.0
+    },
+    "pets_1": {
+      "n": 15,
+      "oracle_gap": 0.20000000000000007,
+      "capture": 0.6666666666666669
+    },
+    "poker_player": {
+      "n": 7,
+      "oracle_gap": 0.0,
+      "capture": 0.0
+    },
+    "real_estate_properties": {
+      "n": 1,
+      "oracle_gap": 0.0,
+      "capture": 0.0
+    },
+    "singer": {
+      "n": 4,
+      "oracle_gap": 0.0,
+      "capture": 0.0
+    },
+    "student_transcripts_tracking": {
+      "n": 25,
+      "oracle_gap": 0.16000000000000003,
+      "capture": 0.0
+    },
+    "tvshow": {
+      "n": 11,
+      "oracle_gap": 0.3636363636363636,
+      "capture": 1.0
+    },
+    "voter_1": {
+      "n": 2,
+      "oracle_gap": 0.0,
+      "capture": 0.0
+    },
+    "world_1": {
+      "n": 49,
+      "oracle_gap": 0.08163265306122452,
+      "capture": 0.0
+    },
+    "wta_1": {
+      "n": 16,
+      "oracle_gap": 0.0,
+      "capture": 0.0
+    }
+  }
+}

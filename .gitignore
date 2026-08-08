@@ -1,4 +1,5 @@
 .venv/
+venv/
 **/__pycache__/
 *.py[cod]
 *.egg-info/
@@ -8,12 +9,11 @@ artifacts/local-data/datasets/
 artifacts/local-data/models/
 dist/
 repositories/
+env.sh
+*.log
 
 # Cloud run artifacts (root-layout): model weights, venvs, caches, datasets
 models/
-venv/
-.venv/
 cache/
 datasets/
 runs/
-*.log

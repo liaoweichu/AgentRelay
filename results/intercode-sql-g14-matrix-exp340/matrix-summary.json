@@ -1,0 +1,14 @@
+{
+  "dev_dbs": [
+    "battle_death",
+    "car_1",
+    "dog_kennels",
+    "poker_player",
+    "tvshow",
+    "wta_1"
+  ],
+  "n_train": 203,
+  "n_dev": 111,
+  "n_dbs_train": 14,
+  "n_dbs_dev": 6
+}

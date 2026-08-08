@@ -1,0 +1,101 @@
+task_id,task_index,hardness,query,reward_edge,reward_cloud,success_edge,success_cloud
+course_teach-List the names of teachers who have not been arranged to teach courses.,701,hard,List the names of teachers who have not been arranged to teach courses.,1.0,1.0,True,True
+world_1-How many people live in countries that do not speak English?,992,extra,How many people live in countries that do not speak English?,1.0,0.0,True,False
+pets_1-Find the last name of the student who has a cat that is age 3.,364,hard,Find the last name of the student who has a cat that is age 3.,1.0,1.0,True,True
+dog_kennels-Find the number of owners who do not own any dogs at this moment.,870,extra,Find the number of owners who do not own any dogs at this moment.,1.0,1.0,True,True
+"student_transcripts_tracking-Show the date of the transcript which shows the least number of results, also list the id.",964,extra,"Show the date of the transcript which shows the least number of results, also list the id.",0.0,1.0,False,True
+world_1-Which regions speak Dutch or English?,1013,hard,Which regions speak Dutch or English?,1.0,1.0,True,True
+wta_1-What are the country code and first name of the players who won in both tourney WTA Championships and Australian Open?,698,extra,What are the country code and first name of the players who won in both tourney WTA Championships and Australian Open?,1.0,1.0,True,True
+cre_Doc_Template_Mgt-Return the type code of the template type that the most templates belong to.,882,hard,Return the type code of the template type that the most templates belong to.,1.0,1.0,True,True
+world_1-Find the number of cities in each district whose population is greater than the average population of cities?,542,extra,Find the number of cities in each district whose population is greater than the average population of cities?,0.0,0.0,False,False
+student_transcripts_tracking-What is the program id and the summary of the degree that has the most students enrolled?,833,extra,What is the program id and the summary of the degree that has the most students enrolled?,1.0,1.0,True,True
+tvshow-What is the series name and country of all TV channels that are playing cartoons directed by Ben Jones and cartoons directed by Michael Chang?,874,extra,What is the series name and country of all TV channels that are playing cartoons directed by Ben Jones and cartoons directed by Michael Chang?,0.17,0.17,False,False
+museum_visit-Find the number of visitors who did not visit any museum opened after 2010.,611,extra,Find the number of visitors who did not visit any museum opened after 2010.,1.0,1.0,True,True
+poker_player-List the names of people that are not poker players.,923,hard,List the names of people that are not poker players.,1.0,1.0,True,True
+cre_Doc_Template_Mgt-What are the ids for templates that are not used in any documents?,1021,hard,What are the ids for templates that are not used in any documents?,1.0,1.0,True,True
+student_transcripts_tracking-Find the kind of program which most number of students are enrolled in?,980,extra,Find the kind of program which most number of students are enrolled in?,1.0,1.0,True,True
+dog_kennels-Which owner has paid the largest amount of money in total for their dogs? Show the owner id and zip code.,465,extra,Which owner has paid the largest amount of money in total for their dogs? Show the owner id and zip code.,1.0,1.0,True,True
+wta_1-List the names of all winners who played in both 2013 and 2016.,382,hard,List the names of all winners who played in both 2013 and 2016.,1.0,1.0,True,True
+wta_1-What is the name of the winner with the most rank points who participated in the Australian Open tournament?,94,hard,What is the name of the winner with the most rank points who participated in the Australian Open tournament?,1.0,0.0,True,False
+pets_1-Find the id of students who do not have a cat pet.,612,hard,Find the id of students who do not have a cat pet.,1.0,1.0,True,True
+course_teach-What is the most commmon hometowns for teachers?,790,hard,What is the most commmon hometowns for teachers?,0.0,0.0,False,False
+car_1-Which models are lighter than 3500 but not built by the 'Ford Motor Company'?,881,extra,Which models are lighter than 3500 but not built by the 'Ford Motor Company'?,0.0,0.0,False,False
+poker_player-Return the birth date of the poker player with the lowest earnings.,320,hard,Return the birth date of the poker player with the lowest earnings.,1.0,1.0,True,True
+student_transcripts_tracking-Which semesters do not have any student enrolled? List the semester name.,672,hard,Which semesters do not have any student enrolled? List the semester name.,1.0,1.0,True,True
+world_1-Which Asian countries have a population that is larger than any country in Africa?,927,extra,Which Asian countries have a population that is larger than any country in Africa?,1.0,1.0,True,True
+world_1-What are the countries that have greater surface area than any country in Europe?,805,hard,What are the countries that have greater surface area than any country in Europe?,0.0,0.0,False,False
+tvshow-What are the countries that are not playing cartoons written by Todd Casey?,876,hard,What are the countries that are not playing cartoons written by Todd Casey?,0.33,1.0,False,True
+world_1-What is the most populace city that speaks English?,221,extra,What is the most populace city that speaks English?,0.0,0.0,False,False
+student_transcripts_tracking-What is the name of the semester with no students enrolled?,598,hard,What is the name of the semester with no students enrolled?,1.0,1.0,True,True
+concert_singer-Show names for all stadiums except for stadiums having a concert in year 2014.,806,hard,Show names for all stadiums except for stadiums having a concert in year 2014.,1.0,1.0,True,True
+car_1-How many cars have a larger accelerate than the car with the largest horsepower?,829,hard,How many cars have a larger accelerate than the car with the largest horsepower?,0.0,1.0,False,True
+museum_visit-What is the name of the visitor who visited both a museum opened before 2009 and a museum opened after 2011?,508,extra,What is the name of the visitor who visited both a museum opened before 2009 and a museum opened after 2011?,0.33,1.0,False,True
+world_1-What language is predominantly spoken in Aruba?,286,extra,What language is predominantly spoken in Aruba?,1.0,1.0,True,True
+network_1-Show name of all students who have some friends and also are liked by someone else.,971,hard,Show name of all students who have some friends and also are liked by someone else.,1.0,1.0,True,True
+"wta_1-What is the first name, country code, and birth date of the player with the most winner rank points across all matches?",688,hard,"What is the first name, country code, and birth date of the player with the most winner rank points across all matches?",1.0,1.0,True,True
+dog_kennels-How many dogs have an age below the average?,879,hard,How many dogs have an age below the average?,1.0,1.0,True,True
+tvshow-Find the series name and country of the tv channel that is playing some cartoons directed by Ben Jones and Michael Chang?,891,extra,Find the series name and country of the tv channel that is playing some cartoons directed by Ben Jones and Michael Chang?,0.25,0.0,False,False
+dog_kennels-Tell me the owner id and last name of the owner who spent the most on treatments of his or her dogs.,151,extra,Tell me the owner id and last name of the owner who spent the most on treatments of his or her dogs.,0.0,0.0,False,False
+network_1-What is the name of the high schooler who has the greatest number of likes?,520,extra,What is the name of the high schooler who has the greatest number of likes?,1.0,1.0,True,True
+"car_1-For the cars with 4 cylinders, which model has the largest horsepower?",399,extra,"For the cars with 4 cylinders, which model has the largest horsepower?",0.0,0.0,False,False
+flight_2-Give the code of the airport with the least flights.,349,extra,Give the code of the airport with the least flights.,0.0,0.0,False,False
+"world_1-Find the name, population and expected life length of asian country with the largest area?",591,hard,"Find the name, population and expected life length of asian country with the largest area?",1.0,1.0,True,True
+concert_singer-What is the year that had the most concerts?,738,hard,What is the year that had the most concerts?,1.0,1.0,True,True
+student_transcripts_tracking-What is the name and id of the department with the most number of degrees ?,367,extra,What is the name and id of the department with the most number of degrees ?,1.0,1.0,True,True
+car_1-Find the make and production time of the cars that were produced in the earliest year?,227,extra,Find the make and production time of the cars that were produced in the earliest year?,0.0,0.0,False,False
+orchestra-What are the record companies that are used by both orchestras founded before 2003 and those founded after 2003?,502,hard,What are the record companies that are used by both orchestras founded before 2003 and those founded after 2003?,1.0,1.0,True,True
+world_1-What are the regions that use English or Dutch?,209,hard,What are the regions that use English or Dutch?,1.0,1.0,True,True
+pets_1-How many dog pets are raised by female students?,116,hard,How many dog pets are raised by female students?,1.0,1.0,True,True
+poker_player-Return the money rank of the poker player with the greatest height.,334,hard,Return the money rank of the poker player with the greatest height.,1.0,1.0,True,True
+flight_2-Which city is the most frequent source airport?,144,extra,Which city is the most frequent source airport?,1.0,1.0,True,True
+dog_kennels-What are the first name and last name of the professionals who have done treatment with cost below average?,295,extra,What are the first name and last name of the professionals who have done treatment with cost below average?,0.33,0.33,False,False
+cre_Doc_Template_Mgt-Return the id and name of the document with the most paragraphs.,991,extra,Return the id and name of the document with the most paragraphs.,1.0,1.0,True,True
+dog_kennels-Count the number of dogs of an age below the average.,414,hard,Count the number of dogs of an age below the average.,1.0,1.0,True,True
+museum_visit-What is the name of the museum that had no visitor yet?,97,hard,What is the name of the museum that had no visitor yet?,1.0,1.0,True,True
+world_1-Give the language that is spoken in the most countries.,183,hard,Give the language that is spoken in the most countries.,1.0,1.0,True,True
+world_1-Which language is spoken by the largest number of countries?,112,hard,Which language is spoken by the largest number of countries?,1.0,1.0,True,True
+car_1-What are the different models created by either the car maker General Motors or weighed more than 3500?,960,extra,What are the different models created by either the car maker General Motors or weighed more than 3500?,0.0,0.0,False,False
+pets_1-Find the major and age of students who do not have a cat pet.,396,extra,Find the major and age of students who do not have a cat pet.,0.64,1.0,False,True
+car_1-What is the maker of the carr produced in the earliest year and what year was it?,779,extra,What is the maker of the carr produced in the earliest year and what year was it?,0.0,0.0,False,False
+wta_1-What is the first name and country code of the player with the most tours?,787,hard,What is the first name and country code of the player with the most tours?,1.0,1.0,True,True
+network_1-Return the names of friends of the high school student Kyle.,167,hard,Return the names of friends of the high school student Kyle.,1.0,1.0,True,True
+car_1-What is the name of the different car makers who produced a car in 1970?,792,extra,What is the name of the different car makers who produced a car in 1970?,1.0,0.0,True,False
+network_1-Show the names of students who have a grade higher than 5 and have at least 2 friends.,913,hard,Show the names of students who have a grade higher than 5 and have at least 2 friends.,1.0,1.0,True,True
+wta_1-What are the first names and country codes for players who won both the WTA Championships and the Australian Open?,671,extra,What are the first names and country codes for players who won both the WTA Championships and the Australian Open?,1.0,1.0,True,True
+orchestra-Show the name of the conductor that has conducted the most number of orchestras.,842,extra,Show the name of the conductor that has conducted the most number of orchestras.,1.0,1.0,True,True
+orchestra-Show the record companies shared by orchestras founded before 2003 and after 2003.,309,hard,Show the record companies shared by orchestras founded before 2003 and after 2003.,1.0,1.0,True,True
+dog_kennels-Which professionals have operated a treatment that costs less than the average? Give me theor first names and last names.,888,extra,Which professionals have operated a treatment that costs less than the average? Give me theor first names and last names.,0.33,0.33,False,False
+dog_kennels-Which first names are used for professionals or owners but are not used as dog names?,822,hard,Which first names are used for professionals or owners but are not used as dog names?,1.0,1.0,True,True
+"car_1-Among the cars that do not have the minimum horsepower , what are the make ids and names of all those with less than 4 cylinders ?",559,extra,"Among the cars that do not have the minimum horsepower , what are the make ids and names of all those with less than 4 cylinders ?",1.0,1.0,True,True
+car_1-Find the model of the car whose weight is below the average weight.,211,extra,Find the model of the car whose weight is below the average weight.,1.0,0.12,True,False
+flight_2-What is the abbreviation of the airilne has the fewest flights and what country is it in?,301,extra,What is the abbreviation of the airilne has the fewest flights and what country is it in?,0.0,0.0,False,False
+car_1-What is the car model with the highest mpg ?,685,hard,What is the car model with the highest mpg ?,0.0,0.0,False,False
+course_teach-What are the names of the teachers and the courses they teach in ascending alphabetical order by the name of the teacher?,422,hard,What are the names of the teachers and the courses they teach in ascending alphabetical order by the name of the teacher?,1.0,1.0,True,True
+orchestra-List the names of orchestras that have no performance.,434,hard,List the names of orchestras that have no performance.,1.0,1.0,True,True
+concert_singer-List all song names by singers above the average age.,267,hard,List all song names by singers above the average age.,1.0,1.0,True,True
+employee_hire_evaluation-find the name of employee who was awarded the most times in the evaluation.,786,extra,find the name of employee who was awarded the most times in the evaluation.,1.0,1.0,True,True
+museum_visit-find the names of museums which have more staff than the minimum staff number of all museums opened after 2010.,481,hard,find the names of museums which have more staff than the minimum staff number of all museums opened after 2010.,1.0,1.0,True,True
+concert_singer-Which year has most number of concerts?,406,hard,Which year has most number of concerts?,1.0,1.0,True,True
+network_1-What is the average grade of students who have friends?,169,hard,What is the average grade of students who have friends?,1.0,0.0,True,False
+student_transcripts_tracking-Which department offers the most number of degrees? List department name and id.,469,extra,Which department offers the most number of degrees? List department name and id.,1.0,1.0,True,True
+employee_hire_evaluation-What is the name of the shop that is hiring the largest number of employees?,201,extra,What is the name of the shop that is hiring the largest number of employees?,1.0,1.0,True,True
+student_transcripts_tracking-What is the name of the course with the most students enrolled?,569,extra,What is the name of the course with the most students enrolled?,0.0,1.0,False,True
+world_1-What are the names of nations speak both English and French?,907,extra,What are the names of nations speak both English and French?,1.0,1.0,True,True
+battle_death-What are the ids and names of the battles that led to more than 10 people killed in total.,365,hard,What are the ids and names of the battles that led to more than 10 people killed in total.,0.2,1.0,False,True
+car_1-Which are the car makers which produce at least 2 models and more than 3 car makers ? List the id and the maker .,545,extra,Which are the car makers which produce at least 2 models and more than 3 car makers ? List the id and the maker .,0.0,0.86,False,False
+pets_1-What is the average age for all students who do not own any pets ?,441,extra,What is the average age for all students who do not own any pets ?,1.0,1.0,True,True
+voter_1-List the area codes in which voters voted both for the contestant 'Tabatha Gehling' and the contestant 'Kelly Clauss'.,476,extra,List the area codes in which voters voted both for the contestant 'Tabatha Gehling' and the contestant 'Kelly Clauss'.,1.0,1.0,True,True
+wta_1-What are the names of players who won in both 2013 and 2016?,359,hard,What are the names of players who won in both 2013 and 2016?,1.0,1.0,True,True
+concert_singer-What are the names of all stadiums that did not have a concert in 2014?,483,hard,What are the names of all stadiums that did not have a concert in 2014?,1.0,1.0,True,True
+world_1-What is the total number of people living in the nations that do not use English?,708,extra,What is the total number of people living in the nations that do not use English?,0.0,0.0,False,False
+cre_Doc_Template_Mgt-Which template type code has most number of templates?,769,hard,Which template type code has most number of templates?,1.0,1.0,True,True
+flight_2-Count the number of United Airlines flights that arrive in Aberdeen.,411,hard,Count the number of United Airlines flights that arrive in Aberdeen.,1.0,1.0,True,True
+flight_2-How many United Airlines flights go to City 'Aberdeen'?,456,hard,How many United Airlines flights go to City 'Aberdeen'?,1.0,1.0,True,True
+concert_singer-What are the names of the stadiums without any concerts?,620,hard,What are the names of the stadiums without any concerts?,1.0,1.0,True,True
+flight_2-Which city has most number of arriving flights?,163,extra,Which city has most number of arriving flights?,1.0,0.0,True,False
+car_1-What are the names of all European countries with at least 3 manufacturers?,332,extra,What are the names of all European countries with at least 3 manufacturers?,0.0,0.0,False,False
+car_1-Which model of the car has the minimum horsepower?,959,hard,Which model of the car has the minimum horsepower?,0.0,0.0,False,False
+flight_2-What is the airport code of the airport with the most flights?,285,extra,What is the airport code of the airport with the most flights?,0.0,1.0,False,True
+car_1-What model has the most different versions?,514,hard,What model has the most different versions?,1.0,1.0,True,True
+flight_2-Which city has most number of departing flights?,695,extra,Which city has most number of departing flights?,0.0,0.0,False,False
+concert_singer-Show the stadium name and capacity with most number of concerts in year 2014 or after.,763,extra,Show the stadium name and capacity with most number of concerts in year 2014 or after.,1.0,1.0,True,True
